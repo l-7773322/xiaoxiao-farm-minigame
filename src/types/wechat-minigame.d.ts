@@ -41,6 +41,7 @@ interface MiniGameCanvasContext2D {
   ): void;
   fill(): void;
   stroke(): void;
+  clip(): void;
   fillRect(x: number, y: number, width: number, height: number): void;
   clearRect(x: number, y: number, width: number, height: number): void;
   fillText(text: string, x: number, y: number): void;

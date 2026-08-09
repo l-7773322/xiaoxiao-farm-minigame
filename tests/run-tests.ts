@@ -2,7 +2,7 @@ import type { ItemType } from "../src/data/ItemConfig";
 import { BlockDetector } from "../src/game/BlockDetector";
 import { StorageManager } from "../src/core/StorageManager";
 import { DropSystem } from "../src/game/DropSystem";
-import { CHAPTER_NAMES, LEVEL_SPECS, LevelGenerator } from "../src/game/LevelGenerator";
+import { CHAPTER_NAMES, getSceneLayout, LEVEL_SPECS, LevelGenerator } from "../src/game/LevelGenerator";
 import { SlotManager } from "../src/game/SlotManager";
 import { Tile } from "../src/game/Tile";
 
@@ -146,6 +146,21 @@ test("30关分为三章且每层都可组成三消", () => {
         expect(count % 3 === 0, `${spec.name} 第 ${layer} 层的 ${type} 不是三的倍数`);
       }
     });
+  }
+});
+
+test("矮屏设备会给底部操作区和盘面留出空间", () => {
+  const layout = getSceneLayout(460, 735);
+  const controlsTop = 735 - 206;
+  expect(layout.sceneBottom < controlsTop, "盘面底部不应压住道具按钮");
+  expect(layout.centerY + layout.radiusY < controlsTop, "盘面椭圆不应进入底部操作区");
+  const tiles = new LevelGenerator().generate(LEVEL_SPECS[5], 460, 735);
+  for (const tile of tiles) {
+    const centerX = tile.x + tile.width / 2;
+    const centerY = tile.y + tile.height / 2;
+    const normalized = ((centerX - layout.centerX) / (layout.radiusX - 19)) ** 2
+      + ((centerY - (layout.centerY - 3)) / (layout.radiusY - 21)) ** 2;
+    expect(normalized <= 1.2, "高密度物品中心应保持在盘面内");
   }
 });
 

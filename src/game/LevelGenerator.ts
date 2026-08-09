@@ -13,6 +13,34 @@ export interface LevelSpec {
   seed: number;
 }
 
+export interface SceneLayout {
+  sceneTop: number;
+  sceneBottom: number;
+  centerX: number;
+  centerY: number;
+  radiusX: number;
+  radiusY: number;
+}
+
+export function getSceneLayout(width: number, height: number): SceneLayout {
+  const sceneTop = Math.max(154, height * 0.19);
+  const controlsTop = height - 206;
+  const baseRadiusY = Math.min(226, height * 0.28);
+  const availableRadiusY = (controlsTop - sceneTop - 20) / 2;
+  const radiusY = Math.max(56, Math.min(baseRadiusY, Math.max(56, availableRadiusY)));
+  const centerY = Math.min(365, sceneTop + radiusY + 8);
+  const radiusX = Math.max(130, width / 2 - 10);
+  const sceneBottom = Math.min(height - 238, controlsTop - 20, centerY + radiusY - 18);
+  return {
+    sceneTop,
+    sceneBottom,
+    centerX: width / 2,
+    centerY,
+    radiusX,
+    radiusY,
+  };
+}
+
 const LEVEL_NAMES = [
   "清晨果摊", "玉米小径", "南瓜木屋", "莓果花圃", "菜园午后",
   "谷仓门前", "牛奶工坊", "面包集市", "金色田埂", "农场晚霞",
@@ -85,11 +113,9 @@ class SeededRandom {
 export class LevelGenerator {
   public generate(spec: LevelSpec, width: number, height: number): Tile[] {
     const random = new SeededRandom(spec.seed);
-    const sceneTop = Math.max(154, height * 0.19);
-    const sceneBottom = height - 238;
+    const layout = getSceneLayout(width, height);
+    const { sceneTop, sceneBottom, centerX, centerY } = layout;
     const sceneHeight = Math.max(260, sceneBottom - sceneTop);
-    const centerX = width / 2;
-    const centerY = sceneTop + sceneHeight * 0.53;
     const densityScale = Math.max(0.74, 1 - Math.max(0, spec.id - 12) * 0.012);
     const tileSize = Math.min(62, Math.max(44, width * 0.15)) * densityScale;
     const tiles: Tile[] = [];
@@ -107,6 +133,8 @@ export class LevelGenerator {
         sceneHeight,
         tileSize,
         random,
+        sceneTop,
+        sceneBottom,
       );
 
       for (let index = 0; index < count; index += 1) {
@@ -181,6 +209,8 @@ export class LevelGenerator {
     sceneHeight: number,
     tileSize: number,
     random: SeededRandom,
+    sceneTop: number,
+    sceneBottom: number,
   ): Array<{ x: number; y: number; rotation: number }> {
     const positions: Array<{ x: number; y: number; rotation: number }> = [];
     const density = 1 - layer / Math.max(1, layerTotal - 1);
@@ -192,11 +222,22 @@ export class LevelGenerator {
       const angle = index * 2.39996 + layer * 0.82;
       const jitterX = (random.next() - 0.5) * tileSize * 0.72;
       const jitterY = (random.next() - 0.5) * tileSize * 0.58;
-      const x = centerX + Math.cos(angle) * radiusX * spiral + jitterX - tileSize / 2;
-      const y = centerY + Math.sin(angle) * radiusY * spiral + jitterY - tileSize / 2;
+      let x = centerX + Math.cos(angle) * radiusX * spiral + jitterX - tileSize / 2;
+      let y = centerY + Math.sin(angle) * radiusY * spiral + jitterY - tileSize / 2;
+      const safeRadiusX = Math.max(28, width / 2 - tileSize * 0.72 - 18);
+      const safeRadiusY = Math.max(28, Math.min(sceneHeight / 2 - tileSize * 0.58, (sceneBottom - sceneTop) / 2));
+      const itemCenterX = x + tileSize / 2;
+      const itemCenterY = y + tileSize / 2;
+      const normalizedX = (itemCenterX - centerX) / safeRadiusX;
+      const normalizedY = (itemCenterY - centerY) / safeRadiusY;
+      const distance = Math.sqrt(normalizedX * normalizedX + normalizedY * normalizedY);
+      if (distance > 1) {
+        x = centerX + normalizedX / distance * safeRadiusX - tileSize / 2;
+        y = centerY + normalizedY / distance * safeRadiusY - tileSize / 2;
+      }
       positions.push({
         x: Math.max(15, Math.min(width - tileSize - 15, x)),
-        y,
+        y: Math.max(sceneTop + 4, Math.min(sceneBottom - tileSize - 4, y)),
         rotation: (random.next() - 0.5) * 1.35,
       });
     }

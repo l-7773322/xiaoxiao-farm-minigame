@@ -1,7 +1,7 @@
 import { ITEM_TYPES, ITEM_VISUALS, type ItemType } from "../data/ItemConfig";
 import { BlockDetector } from "../game/BlockDetector";
 import { DropSystem } from "../game/DropSystem";
-import { CHAPTER_NAMES, LEVEL_SPECS, LevelGenerator } from "../game/LevelGenerator";
+import { CHAPTER_NAMES, getSceneLayout, LEVEL_SPECS, LevelGenerator } from "../game/LevelGenerator";
 import { SlotManager } from "../game/SlotManager";
 import { Tile } from "../game/Tile";
 import { WechatRuntime, type TapPoint } from "../platform/WechatRuntime";
@@ -61,7 +61,7 @@ export class GameManager {
     this.context = runtime.surface.context;
     this.width = runtime.surface.width;
     this.height = runtime.surface.height;
-    this.dropSystem = new DropSystem(this.height - 238);
+    this.dropSystem = new DropSystem(getSceneLayout(this.width, this.height).sceneBottom);
   }
 
   public start(): void {
@@ -650,10 +650,7 @@ export class GameManager {
   }
 
   private drawBasket(): void {
-    const centerX = this.width / 2;
-    const centerY = Math.min(365, this.height * 0.45);
-    const radiusX = this.width / 2 - 10;
-    const radiusY = Math.min(226, this.height * 0.28);
+    const { centerX, centerY, radiusX, radiusY } = getSceneLayout(this.width, this.height);
 
     this.context.save();
     this.context.shadowColor = "rgba(40,45,35,0.38)";
@@ -709,10 +706,7 @@ export class GameManager {
   }
 
   private drawBasketFrontRim(): void {
-    const centerX = this.width / 2;
-    const centerY = Math.min(365, this.height * 0.45);
-    const radiusX = this.width / 2 - 10;
-    const radiusY = Math.min(226, this.height * 0.28);
+    const { centerX, centerY, radiusX, radiusY } = getSceneLayout(this.width, this.height);
     this.context.beginPath();
     this.context.ellipse(centerX, centerY, radiusX - 7, radiusY - 7, 0, 0, Math.PI);
     this.context.strokeStyle = "rgba(91,49,29,0.78)";
@@ -729,6 +723,11 @@ export class GameManager {
     const visible = this.sceneTiles
       .filter((tile) => !tile.removed)
       .sort((left, right) => left.layer - right.layer || left.id - right.id);
+    const { centerX, centerY, radiusX, radiusY } = getSceneLayout(this.width, this.height);
+    this.context.save();
+    this.context.beginPath();
+    this.context.ellipse(centerX, centerY - 3, radiusX - 19, radiusY - 21, 0, 0, Math.PI * 2);
+    this.context.clip();
     for (const tile of visible) {
       drawItemIcon(
         this.context,
@@ -739,6 +738,7 @@ export class GameManager {
         tile.rotation,
       );
     }
+    this.context.restore();
   }
 
   private drawTools(): void {
