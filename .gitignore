@@ -1,0 +1,5 @@
+node_modules/
+minigame/
+build-tests/
+*.log
+.DS_Store

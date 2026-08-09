@@ -1,0 +1,16 @@
+{
+  "name": "xiaoxiao-farm-minigame",
+  "version": "0.1.0",
+  "private": true,
+  "description": "原创微信小游戏《消消农场》的最小可运行核心玩法 Demo",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-static.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p tsconfig.test.json && node build-tests/tests/run-tests.js",
+    "smoke": "pnpm run build && node tests/minigame-smoke.cjs",
+    "verify": "pnpm run typecheck && pnpm run test && pnpm run smoke"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}

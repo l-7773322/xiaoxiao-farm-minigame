@@ -1,0 +1,14 @@
+{
+  "description": "原创堆叠三消微信小游戏《消消农场》",
+  "compileType": "game",
+  "appid": "touristappid",
+  "projectname": "xiaoxiao-farm",
+  "setting": {
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": false,
+    "urlCheck": false
+  },
+  "condition": {}
+}
