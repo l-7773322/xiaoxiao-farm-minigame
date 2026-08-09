@@ -3,6 +3,7 @@ import { BlockDetector } from "../src/game/BlockDetector";
 import { StorageManager } from "../src/core/StorageManager";
 import { DropSystem } from "../src/game/DropSystem";
 import { CHAPTER_NAMES, getSceneLayout, LEVEL_SPECS, LevelGenerator } from "../src/game/LevelGenerator";
+import { GameManager } from "../src/core/GameManager";
 import { SlotManager } from "../src/game/SlotManager";
 import { Tile } from "../src/game/Tile";
 
@@ -155,13 +156,58 @@ test("矮屏设备会给底部操作区和盘面留出空间", () => {
   expect(layout.sceneBottom < controlsTop, "盘面底部不应压住道具按钮");
   expect(layout.centerY + layout.radiusY < controlsTop, "盘面椭圆不应进入底部操作区");
   const tiles = new LevelGenerator().generate(LEVEL_SPECS[5], 460, 735);
+  const minX = layout.centerX - layout.radiusX + 14;
+  const maxX = layout.centerX + layout.radiusX - 14;
+  const minY = layout.centerY - layout.radiusY + 14;
+  const maxY = layout.centerY + layout.radiusY - 32;
   for (const tile of tiles) {
     const centerX = tile.x + tile.width / 2;
     const centerY = tile.y + tile.height / 2;
-    const normalized = ((centerX - layout.centerX) / (layout.radiusX - 19)) ** 2
-      + ((centerY - (layout.centerY - 3)) / (layout.radiusY - 21)) ** 2;
-    expect(normalized <= 1.2, "高密度物品中心应保持在盘面内");
+    expect(centerX >= minX && centerX <= maxX, "高密度物品中心应保持在长方体盘面内");
+    expect(centerY >= minY && centerY <= maxY, "高密度物品中心应保持在长方体盘面内");
   }
+});
+
+test("失败后重试会从第一关开始", () => {
+  const gradient = { addColorStop() {} };
+  const context = new Proxy(
+    { createLinearGradient: () => gradient } as Record<string, unknown>,
+    {
+      get(target, property: string | symbol) {
+        const targetRecord = target as Record<PropertyKey, unknown>;
+        if (!(property in targetRecord)) {
+          targetRecord[property] = () => {};
+        }
+        return targetRecord[property];
+      },
+    },
+  ) as unknown as MiniGameCanvasContext2D;
+  const runtime = {
+    surface: {
+      canvas: { width: 0, height: 0, getContext: () => context },
+      context,
+      width: 375,
+      height: 812,
+      pixelRatio: 1,
+    },
+    onTap() {},
+    playItemSound() {},
+  } as unknown as ConstructorParameters<typeof GameManager>[0];
+  const manager = new GameManager(runtime);
+  const internal = manager as unknown as {
+    beginStage(index: number): void;
+    drawResultOverlay(): void;
+    handleTap(point: { x: number; y: number }): void;
+    status: string;
+    levelIndex: number;
+    primaryButton: { x: number; y: number; width: number; height: number };
+  };
+  internal.beginStage(5);
+  internal.status = "lost";
+  internal.drawResultOverlay();
+  const button = internal.primaryButton;
+  internal.handleTap({ x: button.x + button.width / 2, y: button.y + button.height / 2 });
+  expect(internal.levelIndex === 0, "失败重试不应继续当前关卡");
 });
 
 test("通关后会保存并恢复下一关解锁进度", () => {

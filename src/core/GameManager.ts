@@ -125,7 +125,9 @@ export class GameManager {
 
     if (this.status !== "playing") {
       if (this.isPointInRect(point, this.primaryButton)) {
-        if (this.status === "stageClear") {
+        if (this.status === "lost") {
+          this.beginStage(0);
+        } else if (this.status === "stageClear") {
           this.beginStage(this.levelIndex + 1);
         } else {
           this.beginStage(this.levelIndex);
@@ -276,6 +278,7 @@ export class GameManager {
       this.progress = this.storage.completeLevel(this.progress, this.levelIndex + 1);
     } else if (this.slots.size >= this.slots.capacity) {
       this.status = "lost";
+      this.lastPlayedLevel = 0;
     }
     this.render();
   }
@@ -651,72 +654,79 @@ export class GameManager {
 
   private drawBasket(): void {
     const { centerX, centerY, radiusX, radiusY } = getSceneLayout(this.width, this.height);
+    const left = centerX - radiusX;
+    const top = centerY - radiusY;
+    const width = radiusX * 2;
+    const height = radiusY * 2;
+    const innerInset = 12;
+    const innerLeft = left + innerInset;
+    const innerTop = top + innerInset;
+    const innerWidth = width - innerInset * 2;
+    const innerHeight = height - 32;
 
     this.context.save();
     this.context.shadowColor = "rgba(40,45,35,0.38)";
-    this.context.shadowBlur = 18;
-    this.context.shadowOffsetY = 12;
-    this.context.beginPath();
-    this.context.ellipse(centerX, centerY + 8, radiusX, radiusY, 0, 0, Math.PI * 2);
-    this.context.fillStyle = "#75452c";
+    this.context.shadowBlur = 16;
+    this.context.shadowOffsetY = 10;
+    roundedRect(this.context, left, top + 18, width, height, 18);
+    this.context.fillStyle = "#5a351f";
     this.context.fill();
     this.context.restore();
 
-    this.context.beginPath();
-    this.context.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
-    const rim = this.context.createLinearGradient(0, centerY - radiusY, 0, centerY + radiusY);
-    rim.addColorStop(0, "#f5d995");
-    rim.addColorStop(0.42, "#ca8a49");
-    rim.addColorStop(1, "#7d472b");
+    roundedRect(this.context, left, top, width, height, 18);
+    const rim = this.context.createLinearGradient(0, top, 0, top + height);
+    rim.addColorStop(0, "#d99b56");
+    rim.addColorStop(0.18, "#a96836");
+    rim.addColorStop(1, "#6c3d25");
     this.context.fillStyle = rim;
     this.context.fill();
     this.context.strokeStyle = "#633820";
     this.context.lineWidth = 4;
     this.context.stroke();
 
-    this.context.beginPath();
-    this.context.ellipse(centerX, centerY - 3, radiusX - 15, radiusY - 17, 0, 0, Math.PI * 2);
-    const bowl = this.context.createLinearGradient(0, centerY - radiusY, 0, centerY + radiusY);
-    bowl.addColorStop(0, "#f4dba3");
-    bowl.addColorStop(0.48, "#e4b86f");
-    bowl.addColorStop(1, "#bd7440");
+    roundedRect(this.context, innerLeft, innerTop, innerWidth, innerHeight, 12);
+    const bowl = this.context.createLinearGradient(0, innerTop, 0, innerTop + innerHeight);
+    bowl.addColorStop(0, "#f3d99e");
+    bowl.addColorStop(0.5, "#dca765");
+    bowl.addColorStop(1, "#b66d3c");
     this.context.fillStyle = bowl;
     this.context.fill();
     this.context.strokeStyle = "rgba(91,52,32,0.5)";
-    this.context.lineWidth = 8;
+    this.context.lineWidth = 5;
     this.context.stroke();
 
+    this.context.save();
+    roundedRect(this.context, innerLeft + 2, innerTop + 2, innerWidth - 4, innerHeight - 4, 10);
+    this.context.clip();
     this.context.strokeStyle = "rgba(125,75,40,0.12)";
     this.context.lineWidth = 2;
-    for (let offset = -150; offset <= 150; offset += 30) {
-      const normalized = offset / (radiusY - 25);
-      const lineRadius = (radiusX - 28) * Math.sqrt(Math.max(0, 1 - normalized * normalized));
-      if (lineRadius < 20) {
-        continue;
-      }
+    for (let y = innerTop + 38; y < innerTop + innerHeight - 24; y += 28) {
       this.context.beginPath();
-      this.context.ellipse(centerX, centerY + offset, lineRadius, 10, 0, Math.PI, Math.PI * 2);
+      this.context.moveTo(innerLeft + 18, y);
+      this.context.lineTo(innerLeft + innerWidth - 18, y);
       this.context.stroke();
     }
+    this.context.restore();
 
-    this.context.beginPath();
-    this.context.ellipse(centerX - radiusX * 0.26, centerY - radiusY * 0.22, radiusX * 0.38, radiusY * 0.14, -0.4, 0, Math.PI * 2);
-    this.context.fillStyle = "rgba(255,246,205,0.2)";
+    roundedRect(this.context, innerLeft + 10, innerTop + 7, innerWidth - 20, 14, 7);
+    this.context.fillStyle = "rgba(255,239,183,0.22)";
     this.context.fill();
   }
 
   private drawBasketFrontRim(): void {
     const { centerX, centerY, radiusX, radiusY } = getSceneLayout(this.width, this.height);
-    this.context.beginPath();
-    this.context.ellipse(centerX, centerY, radiusX - 7, radiusY - 7, 0, 0, Math.PI);
-    this.context.strokeStyle = "rgba(91,49,29,0.78)";
-    this.context.lineWidth = 13;
+    const left = centerX - radiusX;
+    const bottom = centerY + radiusY;
+    const width = radiusX * 2;
+    roundedRect(this.context, left + 7, bottom - 29, width - 14, 33, 10);
+    this.context.fillStyle = "#704126";
+    this.context.fill();
+    this.context.strokeStyle = "rgba(68,36,22,0.82)";
+    this.context.lineWidth = 3;
     this.context.stroke();
-    this.context.beginPath();
-    this.context.ellipse(centerX, centerY - 2, radiusX - 10, radiusY - 10, 0, 0, Math.PI);
-    this.context.strokeStyle = "#d99d58";
-    this.context.lineWidth = 6;
-    this.context.stroke();
+    roundedRect(this.context, left + 15, bottom - 23, width - 30, 8, 4);
+    this.context.fillStyle = "rgba(224,158,83,0.75)";
+    this.context.fill();
   }
 
   private drawScene(): void {
@@ -724,9 +734,12 @@ export class GameManager {
       .filter((tile) => !tile.removed)
       .sort((left, right) => left.layer - right.layer || left.id - right.id);
     const { centerX, centerY, radiusX, radiusY } = getSceneLayout(this.width, this.height);
+    const left = centerX - radiusX + 14;
+    const top = centerY - radiusY + 14;
+    const width = radiusX * 2 - 28;
+    const height = radiusY * 2 - 46;
     this.context.save();
-    this.context.beginPath();
-    this.context.ellipse(centerX, centerY - 3, radiusX - 19, radiusY - 21, 0, 0, Math.PI * 2);
+    roundedRect(this.context, left, top, width, height, 10);
     this.context.clip();
     for (const tile of visible) {
       drawItemIcon(
@@ -880,7 +893,7 @@ export class GameManager {
       ? `下一关：${LEVEL_SPECS[this.levelIndex + 1].name}`
       : this.status === "won"
         ? "三大章节全部清空，农庄挑战成功"
-        : "优先凑齐已有物品，再试一次吧";
+        : "失败后将从第 1 关重新开始";
     this.context.fillStyle = this.status === "lost" ? "#c85a3f" : "#46814a";
     this.context.font = "bold 29px sans-serif";
     this.context.textAlign = "center";
@@ -899,7 +912,11 @@ export class GameManager {
       width: panelWidth - 76,
       height: 50,
     };
-    const label = this.status === "stageClear" ? `挑战第 ${this.levelIndex + 2} 关` : "重新挑战本关";
+    const label = this.status === "stageClear"
+      ? `挑战第 ${this.levelIndex + 2} 关`
+      : this.status === "lost"
+        ? "从第 1 关重新开始"
+        : "重新挑战本关";
     this.drawRaisedButton(this.primaryButton, label, "#ed8a43", "#c45f2c");
   }
 

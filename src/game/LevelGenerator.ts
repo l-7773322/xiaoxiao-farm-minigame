@@ -29,7 +29,7 @@ export function getSceneLayout(width: number, height: number): SceneLayout {
   const availableRadiusY = (controlsTop - sceneTop - 20) / 2;
   const radiusY = Math.max(56, Math.min(baseRadiusY, Math.max(56, availableRadiusY)));
   const centerY = Math.min(365, sceneTop + radiusY + 8);
-  const radiusX = Math.max(130, width / 2 - 10);
+  const radiusX = Math.max(130, width / 2 - 18);
   const sceneBottom = Math.min(height - 238, controlsTop - 20, centerY + radiusY - 18);
   return {
     sceneTop,
@@ -115,7 +115,6 @@ export class LevelGenerator {
     const random = new SeededRandom(spec.seed);
     const layout = getSceneLayout(width, height);
     const { sceneTop, sceneBottom, centerX, centerY } = layout;
-    const sceneHeight = Math.max(260, sceneBottom - sceneTop);
     const densityScale = Math.max(0.74, 1 - Math.max(0, spec.id - 12) * 0.012);
     const tileSize = Math.min(62, Math.max(44, width * 0.15)) * densityScale;
     const tiles: Tile[] = [];
@@ -130,11 +129,12 @@ export class LevelGenerator {
         centerX,
         centerY,
         width,
-        sceneHeight,
         tileSize,
         random,
         sceneTop,
         sceneBottom,
+        layout.radiusX,
+        layout.radiusY,
       );
 
       for (let index = 0; index < count; index += 1) {
@@ -206,16 +206,23 @@ export class LevelGenerator {
     centerX: number,
     centerY: number,
     width: number,
-    sceneHeight: number,
     tileSize: number,
     random: SeededRandom,
     sceneTop: number,
     sceneBottom: number,
+    containerRadiusX: number,
+    containerRadiusY: number,
   ): Array<{ x: number; y: number; rotation: number }> {
     const positions: Array<{ x: number; y: number; rotation: number }> = [];
     const density = 1 - layer / Math.max(1, layerTotal - 1);
-    const radiusX = width * (0.1 + density * 0.3);
-    const radiusY = sceneHeight * (0.08 + density * 0.31);
+    const radiusX = containerRadiusX * (0.18 + density * 0.68);
+    const radiusY = containerRadiusY * (0.18 + density * 0.68);
+    const safeHalfWidth = Math.max(28, containerRadiusX - tileSize * 0.72 - 14);
+    const safeHalfHeight = Math.max(28, containerRadiusY - tileSize * 0.58 - 24);
+    const minCenterX = centerX - safeHalfWidth;
+    const maxCenterX = centerX + safeHalfWidth;
+    const minCenterY = Math.max(sceneTop + tileSize / 2 + 4, centerY - safeHalfHeight);
+    const maxCenterY = Math.min(sceneBottom - tileSize / 2 - 4, centerY + safeHalfHeight);
 
     for (let index = 0; index < count; index += 1) {
       const spiral = Math.sqrt((index + 0.5) / Math.max(1, count));
@@ -224,17 +231,12 @@ export class LevelGenerator {
       const jitterY = (random.next() - 0.5) * tileSize * 0.58;
       let x = centerX + Math.cos(angle) * radiusX * spiral + jitterX - tileSize / 2;
       let y = centerY + Math.sin(angle) * radiusY * spiral + jitterY - tileSize / 2;
-      const safeRadiusX = Math.max(28, width / 2 - tileSize * 0.72 - 18);
-      const safeRadiusY = Math.max(28, Math.min(sceneHeight / 2 - tileSize * 0.58, (sceneBottom - sceneTop) / 2));
       const itemCenterX = x + tileSize / 2;
       const itemCenterY = y + tileSize / 2;
-      const normalizedX = (itemCenterX - centerX) / safeRadiusX;
-      const normalizedY = (itemCenterY - centerY) / safeRadiusY;
-      const distance = Math.sqrt(normalizedX * normalizedX + normalizedY * normalizedY);
-      if (distance > 1) {
-        x = centerX + normalizedX / distance * safeRadiusX - tileSize / 2;
-        y = centerY + normalizedY / distance * safeRadiusY - tileSize / 2;
-      }
+      const clampedCenterX = Math.max(minCenterX, Math.min(maxCenterX, itemCenterX));
+      const clampedCenterY = Math.max(minCenterY, Math.min(maxCenterY, itemCenterY));
+      x = clampedCenterX - tileSize / 2;
+      y = clampedCenterY - tileSize / 2;
       positions.push({
         x: Math.max(15, Math.min(width - tileSize - 15, x)),
         y: Math.max(sceneTop + 4, Math.min(sceneBottom - tileSize - 4, y)),
