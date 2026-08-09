@@ -69,6 +69,8 @@ interface WxMiniGameApi {
   getSystemInfoSync(): MiniGameSystemInfo;
   onTouchStart(listener: (event: MiniGameTouchEvent) => void): void;
   vibrateShort?(options?: { type?: "light" | "medium" | "heavy" }): void;
+  getStorageSync?(key: string): unknown;
+  setStorageSync?(key: string, value: unknown): void;
 }
 
 declare const wx: WxMiniGameApi;

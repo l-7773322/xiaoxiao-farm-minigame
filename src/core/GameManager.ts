@@ -1,12 +1,13 @@
 import { ITEM_TYPES, ITEM_VISUALS, type ItemType } from "../data/ItemConfig";
 import { BlockDetector } from "../game/BlockDetector";
-import { LEVEL_SPECS, LevelGenerator } from "../game/LevelGenerator";
+import { CHAPTER_NAMES, LEVEL_SPECS, LevelGenerator } from "../game/LevelGenerator";
 import { SlotManager } from "../game/SlotManager";
 import { Tile } from "../game/Tile";
 import { WechatRuntime, type TapPoint } from "../platform/WechatRuntime";
 import { drawItemIcon, drawMascot, roundedRect } from "../ui/CanvasDrawing";
+import { StorageManager, type ProgressData } from "./StorageManager";
 
-type GameStatus = "home" | "playing" | "stageClear" | "won" | "lost";
+type GameStatus = "home" | "levels" | "playing" | "stageClear" | "won" | "lost";
 type ToolName = "moveOut" | "gather" | "shuffle";
 
 interface Rect {
@@ -22,11 +23,13 @@ export class GameManager {
   private readonly slots = new SlotManager(7);
   private readonly detector = new BlockDetector();
   private readonly generator = new LevelGenerator();
+  private readonly storage = new StorageManager();
   private readonly context: MiniGameCanvasContext2D;
   private readonly width: number;
   private readonly height: number;
   private sceneTiles: Tile[] = [];
   private status: GameStatus = "home";
+  private progress: ProgressData = { highestUnlocked: 1, completedLevels: [] };
   private levelIndex = 0;
   private initialTileCount = 0;
   private totalMatched = 0;
@@ -39,6 +42,8 @@ export class GameManager {
   private temporaryRects: Rect[] = [];
   private backButton: Rect = { ...EMPTY_RECT };
   private primaryButton: Rect = { ...EMPTY_RECT };
+  private levelSelectButton: Rect = { ...EMPTY_RECT };
+  private levelButtons: Rect[] = [];
   private toolButtons: Record<ToolName, Rect> = {
     moveOut: { ...EMPTY_RECT },
     gather: { ...EMPTY_RECT },
@@ -53,13 +58,14 @@ export class GameManager {
   }
 
   public start(): void {
+    this.progress = this.storage.load();
     this.showHome();
     this.runtime.onTap((point) => this.handleTap(point));
   }
 
   private showHome(): void {
     this.status = "home";
-    this.levelIndex = 0;
+    this.levelIndex = this.progress.highestUnlocked - 1;
     this.totalMatched = 0;
     this.sceneTiles = [];
     this.slots.reset();
@@ -70,11 +76,12 @@ export class GameManager {
   private beginStage(index: number): void {
     this.levelIndex = index;
     this.status = "playing";
+    this.totalMatched = 0;
     this.slots.reset();
     this.temporaryTiles = [];
     this.temporaryRects = [];
     this.toolUsed = { moveOut: false, gather: false, shuffle: false };
-    this.toast = index === 0 ? "所有物品都能拿，点准露出的图案" : "物品重叠也能拿，别塞满槽位";
+    this.toast = index === 0 ? "点准露出的图案，三个相同就消除" : "物品重叠也能拿，注意槽位组合";
     this.sceneTiles = this.generator.generate(LEVEL_SPECS[index], this.width, this.height);
     this.initialTileCount = this.sceneTiles.length;
     this.detector.recalculate(this.sceneTiles);
@@ -84,7 +91,22 @@ export class GameManager {
   private handleTap(point: TapPoint): void {
     if (this.status === "home") {
       if (this.isPointInRect(point, this.primaryButton)) {
-        this.beginStage(0);
+        this.beginStage(this.progress.highestUnlocked - 1);
+      } else if (this.isPointInRect(point, this.levelSelectButton)) {
+        this.status = "levels";
+        this.render();
+      }
+      return;
+    }
+
+    if (this.status === "levels") {
+      if (this.isPointInRect(point, this.backButton)) {
+        this.showHome();
+        return;
+      }
+      const levelIndex = this.levelButtons.findIndex((rect) => this.isPointInRect(point, rect));
+      if (levelIndex !== -1 && levelIndex < this.progress.highestUnlocked) {
+        this.beginStage(levelIndex);
       }
       return;
     }
@@ -92,9 +114,9 @@ export class GameManager {
     if (this.status !== "playing") {
       if (this.isPointInRect(point, this.primaryButton)) {
         if (this.status === "stageClear") {
-          this.beginStage(1);
+          this.beginStage(this.levelIndex + 1);
         } else {
-          this.beginStage(0);
+          this.beginStage(this.levelIndex);
         }
       }
       return;
@@ -166,7 +188,6 @@ export class GameManager {
       this.runtime.vibrate("medium");
     } else {
       this.toast = `已收集 ${ITEM_VISUALS[tile.type].label}`;
-      this.runtime.vibrate("light");
     }
     return true;
   }
@@ -175,6 +196,7 @@ export class GameManager {
     const remaining = this.sceneTiles.filter((tile) => !tile.removed).length;
     if (remaining === 0 && this.slots.size === 0 && this.temporaryTiles.length === 0) {
       this.status = this.levelIndex === LEVEL_SPECS.length - 1 ? "won" : "stageClear";
+      this.progress = this.storage.completeLevel(this.progress, this.levelIndex + 1);
       this.runtime.vibrate("heavy");
     } else if (this.slots.size >= this.slots.capacity) {
       this.status = "lost";
@@ -219,7 +241,6 @@ export class GameManager {
       .map((id) => this.slots.remove(id))
       .filter((tile): tile is Tile => tile !== undefined);
     this.toast = `已将 ${this.temporaryTiles.length} 个物品移到暂存区`;
-    this.runtime.vibrate("medium");
     return true;
   }
 
@@ -271,7 +292,6 @@ export class GameManager {
       });
     }
     this.toast = "场上的物品已经重新打乱";
-    this.runtime.vibrate("medium");
     return true;
   }
 
@@ -282,10 +302,15 @@ export class GameManager {
       this.drawHome();
       return;
     }
+    if (this.status === "levels") {
+      this.drawLevelSelect();
+      return;
+    }
 
     this.drawGameHeader();
     this.drawBasket();
     this.drawScene();
+    this.drawBasketFrontRim();
     this.drawTemporaryArea();
     this.drawTools();
     this.drawSlots();
@@ -350,7 +375,7 @@ export class GameManager {
     const cardX = 28;
     const cardY = 315;
     const cardWidth = this.width - 56;
-    roundedRect(this.context, cardX, cardY, cardWidth, 148, 24);
+    roundedRect(this.context, cardX, cardY, cardWidth, 160, 24);
     this.context.fillStyle = "rgba(255,253,234,0.94)";
     this.context.fill();
     this.context.strokeStyle = "rgba(85,118,65,0.24)";
@@ -358,27 +383,126 @@ export class GameManager {
     this.context.stroke();
     this.context.fillStyle = "#496845";
     this.context.font = "bold 18px sans-serif";
-    this.context.fillText("今日丰收挑战", this.width / 2, cardY + 28);
+    this.context.fillText("30 关农场冒险", this.width / 2, cardY + 27);
     this.context.fillStyle = "#ed7b40";
-    this.context.font = "bold 34px sans-serif";
-    this.context.fillText("12,638", this.width / 2, cardY + 72);
+    this.context.font = "bold 30px sans-serif";
+    this.context.fillText(`第 ${this.progress.highestUnlocked} / 30 关`, this.width / 2, cardY + 67);
     this.context.fillStyle = "#72806b";
     this.context.font = "13px sans-serif";
-    this.context.fillText("位农场主已经加入挑战", this.width / 2, cardY + 101);
+    const chapterIndex = Math.floor((this.progress.highestUnlocked - 1) / 10);
+    this.context.fillText(`${CHAPTER_NAMES[chapterIndex]} · 已完成 ${this.progress.completedLevels.length} 关`, this.width / 2, cardY + 98);
     this.context.fillStyle = "#8a6e4a";
     this.context.font = "bold 13px sans-serif";
-    this.context.fillText("热身小摊  →  丰收大堆", this.width / 2, cardY + 126);
+    this.context.fillText("新手农场  →  丰收田园  →  疯狂农庄", this.width / 2, cardY + 130);
 
     this.primaryButton = {
       x: 43,
-      y: this.height - 182,
+      y: this.height - 198,
       width: this.width - 86,
-      height: 62,
+      height: 58,
     };
-    this.drawRaisedButton(this.primaryButton, "开始挑战", "#f08a43", "#c95f29");
+    const primaryLabel = this.progress.highestUnlocked === 1 ? "开始第 1 关" : `继续第 ${this.progress.highestUnlocked} 关`;
+    this.drawRaisedButton(this.primaryButton, primaryLabel, "#f08a43", "#c95f29");
+
+    this.levelSelectButton = {
+      x: 72,
+      y: this.height - 123,
+      width: this.width - 144,
+      height: 42,
+    };
+    roundedRect(
+      this.context,
+      this.levelSelectButton.x,
+      this.levelSelectButton.y,
+      this.levelSelectButton.width,
+      this.levelSelectButton.height,
+      16,
+    );
+    this.context.fillStyle = "rgba(255,250,222,0.94)";
+    this.context.fill();
+    this.context.strokeStyle = "#a66b35";
+    this.context.lineWidth = 2;
+    this.context.stroke();
+    this.context.fillStyle = "#64472f";
+    this.context.font = "bold 15px sans-serif";
+    this.context.fillText("查看 30 关地图", this.width / 2, this.levelSelectButton.y + 21);
+
     this.context.fillStyle = "rgba(255,255,255,0.82)";
+    this.context.font = "12px sans-serif";
+    this.context.fillText("进度自动保存在本机", this.width / 2, this.height - 57);
+  }
+
+  private drawLevelSelect(): void {
+    this.levelButtons = [];
+    this.context.fillStyle = "#294f36";
+    this.context.textAlign = "center";
+    this.context.textBaseline = "middle";
+    this.context.font = "bold 30px sans-serif";
+    this.context.fillText("30 关挑战地图", this.width / 2, 76);
+    this.context.fillStyle = "#5b765d";
     this.context.font = "13px sans-serif";
-    this.context.fillText("无需登录 · 直接试玩", this.width / 2, this.height - 94);
+    this.context.fillText("三大章节 · 难度逐关提升", this.width / 2, 105);
+
+    const buttonWidth = 56;
+    const buttonHeight = 42;
+    const gap = 8;
+    const startX = (this.width - (buttonWidth * 5 + gap * 4)) / 2;
+    const sectionTops = [124, 296, 468];
+
+    CHAPTER_NAMES.forEach((chapter, chapterIndex) => {
+      const sectionTop = sectionTops[chapterIndex];
+      roundedRect(this.context, 20, sectionTop, this.width - 40, 152, 20);
+      this.context.fillStyle = "rgba(255,252,229,0.9)";
+      this.context.fill();
+      this.context.strokeStyle = "rgba(96,111,67,0.24)";
+      this.context.lineWidth = 2;
+      this.context.stroke();
+      this.context.fillStyle = chapterIndex === 0 ? "#4d7e48" : chapterIndex === 1 ? "#bb7636" : "#9b5645";
+      this.context.font = "bold 17px sans-serif";
+      this.context.fillText(`第 ${chapterIndex + 1} 章 · ${chapter}`, this.width / 2, sectionTop + 24);
+
+      for (let localIndex = 0; localIndex < 10; localIndex += 1) {
+        const levelIndex = chapterIndex * 10 + localIndex;
+        const row = Math.floor(localIndex / 5);
+        const column = localIndex % 5;
+        const rect = {
+          x: startX + column * (buttonWidth + gap),
+          y: sectionTop + 44 + row * 48,
+          width: buttonWidth,
+          height: buttonHeight,
+        };
+        this.levelButtons[levelIndex] = rect;
+        const level = levelIndex + 1;
+        const unlocked = level <= this.progress.highestUnlocked;
+        const completed = this.progress.completedLevels.includes(level);
+        roundedRect(this.context, rect.x, rect.y, rect.width, rect.height, 13);
+        this.context.fillStyle = completed
+          ? "#67a85d"
+          : unlocked
+            ? "#f2a553"
+            : "rgba(116,121,105,0.28)";
+        this.context.fill();
+        this.context.strokeStyle = unlocked ? "rgba(105,68,35,0.35)" : "rgba(88,92,81,0.15)";
+        this.context.lineWidth = 1;
+        this.context.stroke();
+        this.context.fillStyle = unlocked ? "#ffffff" : "rgba(73,78,69,0.48)";
+        this.context.font = "bold 15px sans-serif";
+        this.context.fillText(unlocked ? String(level) : "—", rect.x + rect.width / 2, rect.y + rect.height / 2);
+      }
+    });
+
+    this.backButton = {
+      x: 86,
+      y: 644,
+      width: this.width - 172,
+      height: 46,
+    };
+    roundedRect(this.context, this.backButton.x, this.backButton.y, this.backButton.width, this.backButton.height, 17);
+    this.context.fillStyle = "#3f7149";
+    this.context.fill();
+    this.context.fillStyle = "#ffffff";
+    this.context.font = "bold 16px sans-serif";
+    this.context.fillText("返回首页", this.width / 2, this.backButton.y + 23);
   }
 
   private drawGameHeader(): void {
@@ -396,7 +520,7 @@ export class GameManager {
     this.context.textBaseline = "middle";
     this.context.fillStyle = "#fff4bf";
     this.context.font = "bold 13px sans-serif";
-    this.context.fillText("今日挑战 12,638", 28, 35);
+    this.context.fillText(`${spec.chapter} ${spec.id}/30`, 28, 35);
     this.context.textAlign = "right";
     this.context.fillStyle = "#d7ead0";
     this.context.fillText(`已消除 ${this.totalMatched}`, this.width - 28, 35);
@@ -431,40 +555,77 @@ export class GameManager {
   private drawBasket(): void {
     const centerX = this.width / 2;
     const centerY = Math.min(365, this.height * 0.45);
-    const radiusX = this.width / 2 - 12;
+    const radiusX = this.width / 2 - 10;
     const radiusY = Math.min(226, this.height * 0.28);
 
     this.context.save();
-    this.context.shadowColor = "rgba(62,43,24,0.35)";
-    this.context.shadowBlur = 14;
-    this.context.shadowOffsetY = 9;
+    this.context.shadowColor = "rgba(40,45,35,0.38)";
+    this.context.shadowBlur = 18;
+    this.context.shadowOffsetY = 12;
     this.context.beginPath();
-    this.context.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
-    this.context.fillStyle = "#9b5f2e";
+    this.context.ellipse(centerX, centerY + 8, radiusX, radiusY, 0, 0, Math.PI * 2);
+    this.context.fillStyle = "#75452c";
     this.context.fill();
     this.context.restore();
 
     this.context.beginPath();
-    this.context.ellipse(centerX, centerY - 5, radiusX - 8, radiusY - 12, 0, 0, Math.PI * 2);
-    const weave = this.context.createLinearGradient(0, centerY - radiusY, 0, centerY + radiusY);
-    weave.addColorStop(0, "#e4b761");
-    weave.addColorStop(0.5, "#c9883e");
-    weave.addColorStop(1, "#a96831");
-    this.context.fillStyle = weave;
+    this.context.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
+    const rim = this.context.createLinearGradient(0, centerY - radiusY, 0, centerY + radiusY);
+    rim.addColorStop(0, "#f5d995");
+    rim.addColorStop(0.42, "#ca8a49");
+    rim.addColorStop(1, "#7d472b");
+    this.context.fillStyle = rim;
     this.context.fill();
-    this.context.strokeStyle = "rgba(100,55,24,0.42)";
-    this.context.lineWidth = 3;
+    this.context.strokeStyle = "#633820";
+    this.context.lineWidth = 4;
     this.context.stroke();
 
-    this.context.strokeStyle = "rgba(117,68,31,0.18)";
+    this.context.beginPath();
+    this.context.ellipse(centerX, centerY - 3, radiusX - 15, radiusY - 17, 0, 0, Math.PI * 2);
+    const bowl = this.context.createLinearGradient(0, centerY - radiusY, 0, centerY + radiusY);
+    bowl.addColorStop(0, "#f4dba3");
+    bowl.addColorStop(0.48, "#e4b86f");
+    bowl.addColorStop(1, "#bd7440");
+    this.context.fillStyle = bowl;
+    this.context.fill();
+    this.context.strokeStyle = "rgba(91,52,32,0.5)";
+    this.context.lineWidth = 8;
+    this.context.stroke();
+
+    this.context.strokeStyle = "rgba(125,75,40,0.12)";
     this.context.lineWidth = 2;
-    for (let offset = -130; offset <= 130; offset += 26) {
-      const length = Math.sqrt(Math.max(0, radiusX * radiusX - offset * offset));
+    for (let offset = -150; offset <= 150; offset += 30) {
+      const normalized = offset / (radiusY - 25);
+      const lineRadius = (radiusX - 28) * Math.sqrt(Math.max(0, 1 - normalized * normalized));
+      if (lineRadius < 20) {
+        continue;
+      }
       this.context.beginPath();
-      this.context.moveTo(centerX - length * 0.84, centerY + offset * 0.72);
-      this.context.lineTo(centerX + length * 0.84, centerY + offset * 0.72);
+      this.context.ellipse(centerX, centerY + offset, lineRadius, 10, 0, Math.PI, Math.PI * 2);
       this.context.stroke();
     }
+
+    this.context.beginPath();
+    this.context.ellipse(centerX - radiusX * 0.26, centerY - radiusY * 0.22, radiusX * 0.38, radiusY * 0.14, -0.4, 0, Math.PI * 2);
+    this.context.fillStyle = "rgba(255,246,205,0.2)";
+    this.context.fill();
+  }
+
+  private drawBasketFrontRim(): void {
+    const centerX = this.width / 2;
+    const centerY = Math.min(365, this.height * 0.45);
+    const radiusX = this.width / 2 - 10;
+    const radiusY = Math.min(226, this.height * 0.28);
+    this.context.beginPath();
+    this.context.ellipse(centerX, centerY, radiusX - 7, radiusY - 7, 0, 0, Math.PI);
+    this.context.strokeStyle = "rgba(91,49,29,0.78)";
+    this.context.lineWidth = 13;
+    this.context.stroke();
+    this.context.beginPath();
+    this.context.ellipse(centerX, centerY - 2, radiusX - 10, radiusY - 10, 0, 0, Math.PI);
+    this.context.strokeStyle = "#d99d58";
+    this.context.lineWidth = 6;
+    this.context.stroke();
   }
 
   private drawScene(): void {
@@ -611,11 +772,15 @@ export class GameManager {
     this.context.lineWidth = 3;
     this.context.stroke();
 
-    const title = this.status === "stageClear" ? "第一关完成！" : this.status === "won" ? "大丰收！" : "槽位塞满了";
-    const subtitle = this.status === "stageClear"
-      ? "小摊只是热身，真正的大堆来了"
+    const title = this.status === "stageClear"
+      ? `第 ${this.levelIndex + 1} 关完成！`
       : this.status === "won"
-        ? "两关全部清空，今天的挑战成功"
+        ? "30 关全部完成！"
+        : "槽位塞满了";
+    const subtitle = this.status === "stageClear"
+      ? `下一关：${LEVEL_SPECS[this.levelIndex + 1].name}`
+      : this.status === "won"
+        ? "三大章节全部清空，农庄挑战成功"
         : "优先凑齐已有物品，再试一次吧";
     this.context.fillStyle = this.status === "lost" ? "#c85a3f" : "#46814a";
     this.context.font = "bold 29px sans-serif";
@@ -635,7 +800,7 @@ export class GameManager {
       width: panelWidth - 76,
       height: 50,
     };
-    const label = this.status === "stageClear" ? "进入丰收大堆" : "重新挑战";
+    const label = this.status === "stageClear" ? `挑战第 ${this.levelIndex + 2} 关` : "重新挑战本关";
     this.drawRaisedButton(this.primaryButton, label, "#ed8a43", "#c45f2c");
   }
 

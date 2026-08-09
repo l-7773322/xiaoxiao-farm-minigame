@@ -1,6 +1,7 @@
 import type { ItemType } from "../src/data/ItemConfig";
 import { BlockDetector } from "../src/game/BlockDetector";
-import { LEVEL_SPECS, LevelGenerator } from "../src/game/LevelGenerator";
+import { StorageManager } from "../src/core/StorageManager";
+import { CHAPTER_NAMES, LEVEL_SPECS, LevelGenerator } from "../src/game/LevelGenerator";
 import { SlotManager } from "../src/game/SlotManager";
 import { Tile } from "../src/game/Tile";
 
@@ -115,7 +116,11 @@ test("重叠关系会更新但不会锁住下层物品", () => {
   expect(!lower.blocked, "移除上层后下层应恢复可点击");
 });
 
-test("双阶段关卡数量正确且每层都可组成三消", () => {
+test("30关分为三章且每层都可组成三消", () => {
+  expect(LEVEL_SPECS.length === 30, "应提供完整 30 关");
+  for (const chapter of CHAPTER_NAMES) {
+    expect(LEVEL_SPECS.filter((spec) => spec.chapter === chapter).length === 10, `${chapter} 应有 10 关`);
+  }
   const generator = new LevelGenerator();
   for (const spec of LEVEL_SPECS) {
     const tiles = generator.generate(spec, 375, 812);
@@ -129,6 +134,23 @@ test("双阶段关卡数量正确且每层都可组成三消", () => {
       }
     });
   }
+});
+
+test("通关后会保存并恢复下一关解锁进度", () => {
+  const storage = new Map<string, unknown>();
+  Object.assign(globalThis, {
+    wx: {
+      getStorageSync: (key: string) => storage.get(key),
+      setStorageSync: (key: string, value: unknown) => storage.set(key, value),
+    },
+  });
+  const manager = new StorageManager();
+  const initial = manager.load();
+  expect(initial.highestUnlocked === 1, "新存档应从第一关开始");
+  manager.completeLevel(initial, 1);
+  const restored = manager.load();
+  expect(restored.highestUnlocked === 2, "完成第一关后应解锁第二关");
+  expect(restored.completedLevels.includes(1), "完成记录应写入本地存档");
 });
 
 console.log(`\n核心逻辑测试通过：${passed} 项`);
