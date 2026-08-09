@@ -58,6 +58,34 @@ interface MiniGameCanvas {
   getContext(contextId: "2d"): MiniGameCanvasContext2D;
 }
 
+interface MiniGameAudioParam {
+  setValueAtTime(value: number, startTime: number): void;
+  exponentialRampToValueAtTime(value: number, endTime: number): void;
+}
+
+interface MiniGameAudioNode {
+  connect(destination: MiniGameAudioNode): void;
+}
+
+interface MiniGameOscillatorNode extends MiniGameAudioNode {
+  type: string;
+  frequency: MiniGameAudioParam;
+  start(when?: number): void;
+  stop(when?: number): void;
+}
+
+interface MiniGameGainNode extends MiniGameAudioNode {
+  gain: MiniGameAudioParam;
+}
+
+interface MiniGameWebAudioContext {
+  currentTime: number;
+  destination: MiniGameAudioNode;
+  createOscillator(): MiniGameOscillatorNode;
+  createGain(): MiniGameGainNode;
+  resume?(): Promise<void> | void;
+}
+
 interface MiniGameSystemInfo {
   windowWidth: number;
   windowHeight: number;
@@ -68,7 +96,7 @@ interface WxMiniGameApi {
   createCanvas(): MiniGameCanvas;
   getSystemInfoSync(): MiniGameSystemInfo;
   onTouchStart(listener: (event: MiniGameTouchEvent) => void): void;
-  vibrateShort?(options?: { type?: "light" | "medium" | "heavy" }): void;
+  createWebAudioContext?(): MiniGameWebAudioContext;
   getStorageSync?(key: string): unknown;
   setStorageSync?(key: string, value: unknown): void;
 }

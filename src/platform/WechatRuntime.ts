@@ -1,3 +1,6 @@
+import { type ItemType } from "../data/ItemConfig";
+import { SoundManager } from "./SoundManager";
+
 export interface TapPoint {
   x: number;
   y: number;
@@ -13,6 +16,7 @@ export interface GameSurface {
 
 export class WechatRuntime {
   public readonly surface: GameSurface;
+  private readonly sound = new SoundManager();
 
   public constructor() {
     const systemInfo = wx.getSystemInfoSync();
@@ -42,7 +46,7 @@ export class WechatRuntime {
     });
   }
 
-  public vibrate(type: "light" | "medium" | "heavy" = "light"): void {
-    wx.vibrateShort?.({ type });
+  public playItemSound(type: ItemType): void {
+    this.sound.playItem(type);
   }
 }

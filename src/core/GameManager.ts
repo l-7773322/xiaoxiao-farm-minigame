@@ -35,10 +35,10 @@ export class GameManager {
   private levelIndex = 0;
   private initialTileCount = 0;
   private totalMatched = 0;
-  private toolUsed: Record<ToolName, boolean> = {
-    moveOut: false,
-    gather: false,
-    shuffle: false,
+  private toolRemaining: Record<ToolName, number> = {
+    moveOut: 1,
+    gather: 1,
+    shuffle: 1,
   };
   private temporaryTiles: Tile[] = [];
   private temporaryRects: Rect[] = [];
@@ -87,7 +87,7 @@ export class GameManager {
     this.slots.reset();
     this.temporaryTiles = [];
     this.temporaryRects = [];
-    this.toolUsed = { moveOut: false, gather: false, shuffle: false };
+    this.toolRemaining = { moveOut: 1, gather: 1, shuffle: 1 };
     this.toast = index === 0 ? "点准露出的图案，三个相同就消除" : "物品重叠也能拿，注意槽位组合";
     this.sceneTiles = this.generator.generate(LEVEL_SPECS[index], this.width, this.height);
     this.initialTileCount = this.sceneTiles.length;
@@ -193,10 +193,10 @@ export class GameManager {
     if (update.matched.length === 3) {
       this.totalMatched += 3;
       this.toast = `${ITEM_VISUALS[tile.type].label} × 3，消除！`;
-      this.runtime.vibrate("medium");
     } else {
       this.toast = `已收集 ${ITEM_VISUALS[tile.type].label}`;
     }
+    this.runtime.playItemSound(tile.type);
     if (isSceneTile) {
       this.queueDrop(tile);
     }
@@ -269,17 +269,15 @@ export class GameManager {
     if (remaining === 0 && this.slots.size === 0 && this.temporaryTiles.length === 0) {
       this.status = this.levelIndex === LEVEL_SPECS.length - 1 ? "won" : "stageClear";
       this.progress = this.storage.completeLevel(this.progress, this.levelIndex + 1);
-      this.runtime.vibrate("heavy");
     } else if (this.slots.size >= this.slots.capacity) {
       this.status = "lost";
-      this.runtime.vibrate("heavy");
     }
     this.render();
   }
 
   private useTool(name: ToolName): void {
-    if (this.toolUsed[name]) {
-      this.toast = "本关已经用过这个道具了";
+    if (this.toolRemaining[name] <= 0) {
+      this.toast = `${this.getToolLabel(name)}次数已用完`;
       this.render();
       return;
     }
@@ -294,7 +292,7 @@ export class GameManager {
     }
 
     if (successful) {
-      this.toolUsed[name] = true;
+      this.toolRemaining[name] -= 1;
       this.detector.recalculate(this.sceneTiles);
       this.finishMove();
     } else {
@@ -365,6 +363,15 @@ export class GameManager {
     }
     this.toast = "场上的物品已经重新打乱";
     return true;
+  }
+
+  private getToolLabel(name: ToolName): string {
+    const labels: Record<ToolName, string> = {
+      moveOut: "移出",
+      gather: "凑齐",
+      shuffle: "打乱",
+    };
+    return labels[name];
   }
 
   private render(): void {
@@ -730,16 +737,18 @@ export class GameManager {
       const rect = { x: 18 + index * (buttonWidth + gap), y, width: buttonWidth, height: 47 };
       this.toolButtons[name] = rect;
       roundedRect(this.context, rect.x, rect.y, rect.width, rect.height, 14);
-      this.context.fillStyle = this.toolUsed[name] ? "rgba(77,82,68,0.55)" : "#fff8dc";
+      const remaining = this.toolRemaining[name];
+      const exhausted = remaining <= 0;
+      this.context.fillStyle = exhausted ? "rgba(77,82,68,0.55)" : "#fff8dc";
       this.context.fill();
-      this.context.strokeStyle = this.toolUsed[name] ? "rgba(255,255,255,0.16)" : "#b27338";
+      this.context.strokeStyle = exhausted ? "rgba(255,255,255,0.16)" : "#b27338";
       this.context.lineWidth = 2;
       this.context.stroke();
-      this.context.fillStyle = this.toolUsed[name] ? "rgba(255,255,255,0.6)" : "#6a4728";
+      this.context.fillStyle = exhausted ? "rgba(255,255,255,0.6)" : "#6a4728";
       this.context.textAlign = "center";
       this.context.textBaseline = "middle";
       this.context.font = "bold 14px sans-serif";
-      this.context.fillText(this.toolUsed[name] ? `${labels[name]} ✓` : labels[name], rect.x + rect.width / 2, rect.y + 24);
+      this.context.fillText(`${labels[name]} ${remaining}次`, rect.x + rect.width / 2, rect.y + 24);
     });
   }
 
