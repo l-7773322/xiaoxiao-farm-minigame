@@ -83,6 +83,7 @@ assert.equal(typeof touchListener, "function", "小游戏入口应注册触摸�
 assert(drawnTexts.includes("消消农场"), "首页应绘制游戏标题");
 assert(drawnTexts.includes("30 关农场冒险"), "首页应显示 30 关进度");
 assert(drawnTexts.includes("开始第 1 关"), "新存档应从第一关开始");
+assert(drawnTexts.includes("重新挑战第 1 关"), "首页应显示重新挑战入口");
 assert(drawnTexts.includes("查看 30 关地图"), "首页应提供关卡地图入口");
 
 drawnTexts.length = 0;
@@ -117,5 +118,13 @@ assert(drawnTexts.some((text) => text.includes("↻  打乱 0次")), "打乱使�
 drawnTexts.length = 0;
 tap(318, 606);
 assert(drawnTexts.includes("打乱次数已用完"), "打乱用完后再次点击应被限制");
+
+drawnTexts.length = 0;
+tap(44, 64);
+assert(drawnTexts.includes("重新挑战第 1 关"), "返回首页后应保留重新挑战入口");
+
+drawnTexts.length = 0;
+tap(187, 639);
+assert(drawnTexts.includes("第 1 关 · 清晨果摊"), "点击重新挑战应返回刚才游玩的关卡");
 
 console.log("✓ 30关地图、物品音效、无振动与道具次数限制冒烟测试通过");

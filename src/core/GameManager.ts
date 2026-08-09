@@ -33,6 +33,7 @@ export class GameManager {
   private status: GameStatus = "home";
   private progress: ProgressData = { highestUnlocked: 1, completedLevels: [] };
   private levelIndex = 0;
+  private lastPlayedLevel: number | undefined;
   private initialTileCount = 0;
   private totalMatched = 0;
   private toolRemaining: Record<ToolName, number> = {
@@ -45,6 +46,7 @@ export class GameManager {
   private backButton: Rect = { ...EMPTY_RECT };
   private primaryButton: Rect = { ...EMPTY_RECT };
   private levelSelectButton: Rect = { ...EMPTY_RECT };
+  private replayButton: Rect = { ...EMPTY_RECT };
   private levelButtons: Rect[] = [];
   private toolButtons: Record<ToolName, Rect> = {
     moveOut: { ...EMPTY_RECT },
@@ -81,6 +83,7 @@ export class GameManager {
 
   private beginStage(index: number): void {
     this.cancelDropAnimation();
+    this.lastPlayedLevel = index;
     this.levelIndex = index;
     this.status = "playing";
     this.totalMatched = 0;
@@ -99,6 +102,8 @@ export class GameManager {
     if (this.status === "home") {
       if (this.isPointInRect(point, this.primaryButton)) {
         this.beginStage(this.progress.highestUnlocked - 1);
+      } else if (this.isPointInRect(point, this.replayButton)) {
+        this.beginStage(this.getReplayLevel());
       } else if (this.isPointInRect(point, this.levelSelectButton)) {
         this.status = "levels";
         this.render();
@@ -476,12 +481,25 @@ export class GameManager {
 
     this.primaryButton = {
       x: 43,
-      y: this.height - 198,
+      y: this.height - 270,
       width: this.width - 86,
       height: 58,
     };
     const primaryLabel = this.progress.highestUnlocked === 1 ? "开始第 1 关" : `继续第 ${this.progress.highestUnlocked} 关`;
     this.drawRaisedButton(this.primaryButton, primaryLabel, "#f08a43", "#c95f29");
+
+    this.replayButton = {
+      x: 43,
+      y: this.height - 198,
+      width: this.width - 86,
+      height: 50,
+    };
+    this.drawRaisedButton(
+      this.replayButton,
+      `重新挑战第 ${this.getReplayLevel() + 1} 关`,
+      "#6f9b58",
+      "#4d753f",
+    );
 
     this.levelSelectButton = {
       x: 72,
@@ -914,5 +932,9 @@ export class GameManager {
 
   private isPointInRect(point: TapPoint, rect: Rect): boolean {
     return point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height;
+  }
+
+  private getReplayLevel(): number {
+    return this.lastPlayedLevel ?? Math.max(0, this.progress.highestUnlocked - 1);
   }
 }
