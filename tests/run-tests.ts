@@ -1,4 +1,4 @@
-import type { ItemType } from "../src/data/ItemConfig";
+import { ITEM_TYPES, type ItemType } from "../src/data/ItemConfig";
 import { BlockDetector } from "../src/game/BlockDetector";
 import { StorageManager } from "../src/core/StorageManager";
 import { DropSystem } from "../src/game/DropSystem";
@@ -7,6 +7,7 @@ import { GameManager } from "../src/core/GameManager";
 import { PileLayout, type PileBounds } from "../src/game/PileLayout";
 import { SlotManager } from "../src/game/SlotManager";
 import { Tile } from "../src/game/Tile";
+import { drawItemIcon } from "../src/ui/CanvasDrawing";
 
 let nextId = 1;
 let passed = 0;
@@ -39,6 +40,31 @@ function test(name: string, body: () => void): void {
   passed += 1;
   console.log(`✓ ${name}`);
 }
+
+test("所有农场物品都能绘制立体明暗", () => {
+  let gradientStops = 0;
+  const gradient = {
+    addColorStop() {
+      gradientStops += 1;
+    },
+  };
+  const context = new Proxy(
+    { createLinearGradient: () => gradient } as Record<string, unknown>,
+    {
+      get(target, property: string | symbol) {
+        const targetRecord = target as Record<PropertyKey, unknown>;
+        if (!(property in targetRecord)) {
+          targetRecord[property] = () => {};
+        }
+        return targetRecord[property];
+      },
+    },
+  ) as unknown as MiniGameCanvasContext2D;
+  for (const type of ITEM_TYPES) {
+    drawItemIcon(context, type, 96, 96, 64, 0.18);
+  }
+  expect(gradientStops === ITEM_TYPES.length * 3, "每个物品都应包含受光、主色和暗侧三段渐变");
+});
 
 test("三个相同物品自动消除", () => {
   const slots = new SlotManager();
