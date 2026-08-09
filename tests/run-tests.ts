@@ -1,6 +1,7 @@
 import type { ItemType } from "../src/data/ItemConfig";
 import { BlockDetector } from "../src/game/BlockDetector";
 import { StorageManager } from "../src/core/StorageManager";
+import { DropSystem } from "../src/game/DropSystem";
 import { CHAPTER_NAMES, LEVEL_SPECS, LevelGenerator } from "../src/game/LevelGenerator";
 import { SlotManager } from "../src/game/SlotManager";
 import { Tile } from "../src/game/Tile";
@@ -116,11 +117,23 @@ test("重叠关系会更新但不会锁住下层物品", () => {
   expect(!lower.blocked, "移除上层后下层应恢复可点击");
 });
 
+test("清掉上层后重叠的下层会有落坠动画", () => {
+  const drop = new DropSystem(600);
+  const lower = createTile("apple", { x: 20, y: 100, layer: 0 });
+  const upper = createTile("corn", { x: 25, y: 105, layer: 1 });
+  const farAway = createTile("berry", { x: 220, y: 100, layer: 0 });
+  const moves = drop.release([lower, upper, farAway], upper);
+  expect(moves.length === 1, "只应检测到与清除物品实际重叠的下层");
+  expect(moves[0].tile.id === lower.id && moves[0].toY > moves[0].fromY, "下层物品应向下落位");
+});
+
 test("30关分为三章且每层都可组成三消", () => {
   expect(LEVEL_SPECS.length === 30, "应提供完整 30 关");
   for (const chapter of CHAPTER_NAMES) {
     expect(LEVEL_SPECS.filter((spec) => spec.chapter === chapter).length === 10, `${chapter} 应有 10 关`);
   }
+  expect(LEVEL_SPECS[1].layerCounts.reduce((sum, count) => sum + count, 0) >= 100, "第二关应明显提高密度");
+  expect(LEVEL_SPECS[5].layerCounts.reduce((sum, count) => sum + count, 0) >= 160, "第六关应保持高数量堆叠");
   const generator = new LevelGenerator();
   for (const spec of LEVEL_SPECS) {
     const tiles = generator.generate(spec, 375, 812);

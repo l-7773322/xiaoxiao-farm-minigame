@@ -22,14 +22,23 @@ const LEVEL_NAMES = [
   "满园丰收", "超级菜市", "金秋盛宴", "终极粮仓", "农庄传奇",
 ] as const;
 
-const LEVEL_LAYER_COUNTS: readonly (readonly number[])[] = [
-  [6, 6], [9, 6], [9, 6, 3], [12, 9, 3], [12, 9, 6],
-  [15, 9, 6], [15, 12, 6], [15, 12, 9], [18, 12, 9], [18, 15, 9],
-  [18, 15, 9, 3], [18, 15, 9, 6], [21, 15, 9, 6], [21, 18, 9, 6], [21, 18, 12, 6],
-  [24, 18, 12, 6], [24, 18, 12, 9], [24, 21, 12, 9], [27, 21, 12, 9], [27, 21, 15, 9],
-  [24, 18, 15, 9, 9], [24, 21, 15, 12, 6], [27, 21, 15, 12, 6], [27, 21, 18, 12, 6], [27, 24, 18, 12, 6],
-  [30, 24, 18, 12, 6], [30, 24, 21, 12, 6], [30, 24, 21, 15, 6], [33, 24, 21, 15, 6], [33, 27, 21, 15, 6],
-];
+function makeLayerCounts(tripletGroups: number, layers: number): readonly number[] {
+  const counts = new Array<number>(layers).fill(0);
+  for (let group = 0; group < tripletGroups; group += 1) {
+    counts[group % layers] += 3;
+  }
+  return counts;
+}
+
+const LEVEL_LAYER_COUNTS: readonly (readonly number[])[] = Array.from({ length: 30 }, (_, index) => {
+  if (index === 0) {
+    return [12, 6];
+  }
+  const id = index + 1;
+  const tripletGroups = Math.min(110, 36 + (id - 2) * 5);
+  const layers = Math.min(8, 4 + Math.floor((id - 2) / 4));
+  return makeLayerCounts(tripletGroups, layers);
+});
 
 export const LEVEL_SPECS: readonly LevelSpec[] = LEVEL_LAYER_COUNTS.map((layerCounts, index) => {
   const id = index + 1;

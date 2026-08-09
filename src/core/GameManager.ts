@@ -1,5 +1,6 @@
 import { ITEM_TYPES, ITEM_VISUALS, type ItemType } from "../data/ItemConfig";
 import { BlockDetector } from "../game/BlockDetector";
+import { DropSystem } from "../game/DropSystem";
 import { CHAPTER_NAMES, LEVEL_SPECS, LevelGenerator } from "../game/LevelGenerator";
 import { SlotManager } from "../game/SlotManager";
 import { Tile } from "../game/Tile";
@@ -22,6 +23,7 @@ const EMPTY_RECT: Rect = { x: 0, y: 0, width: 0, height: 0 };
 export class GameManager {
   private readonly slots = new SlotManager(7);
   private readonly detector = new BlockDetector();
+  private readonly dropSystem: DropSystem;
   private readonly generator = new LevelGenerator();
   private readonly storage = new StorageManager();
   private readonly context: MiniGameCanvasContext2D;
@@ -50,11 +52,14 @@ export class GameManager {
     shuffle: { ...EMPTY_RECT },
   };
   private toast = "";
+  private readonly dropMotions = new Map<number, { tile: Tile; fromY: number; toY: number; startedAt: number }>();
+  private dropFrame: number | undefined;
 
   public constructor(private readonly runtime: WechatRuntime) {
     this.context = runtime.surface.context;
     this.width = runtime.surface.width;
     this.height = runtime.surface.height;
+    this.dropSystem = new DropSystem(this.height - 238);
   }
 
   public start(): void {
@@ -64,6 +69,7 @@ export class GameManager {
   }
 
   private showHome(): void {
+    this.cancelDropAnimation();
     this.status = "home";
     this.levelIndex = this.progress.highestUnlocked - 1;
     this.totalMatched = 0;
@@ -74,6 +80,7 @@ export class GameManager {
   }
 
   private beginStage(index: number): void {
+    this.cancelDropAnimation();
     this.levelIndex = index;
     this.status = "playing";
     this.totalMatched = 0;
@@ -175,6 +182,7 @@ export class GameManager {
   }
 
   private collectTile(tile: Tile): boolean {
+    const isSceneTile = this.sceneTiles.includes(tile) && !tile.removed;
     tile.removed = true;
     const update = this.slots.add(tile);
     if (!update.accepted) {
@@ -189,7 +197,71 @@ export class GameManager {
     } else {
       this.toast = `已收集 ${ITEM_VISUALS[tile.type].label}`;
     }
+    if (isSceneTile) {
+      this.queueDrop(tile);
+    }
     return true;
+  }
+
+  private queueDrop(removedTile: Tile): void {
+    const moves = this.dropSystem.release(this.sceneTiles, removedTile);
+    if (moves.length === 0) {
+      return;
+    }
+
+    const startedAt = Date.now();
+    for (const move of moves) {
+      this.dropMotions.set(move.tile.id, {
+        tile: move.tile,
+        fromY: move.fromY,
+        toY: move.toY,
+        startedAt,
+      });
+    }
+    this.toast = this.toast.includes("× 3")
+      ? `${this.toast} · 上层移开了，下面的物品落下来了`
+      : "上层移开了，下面的物品落下来了";
+
+    if (typeof requestAnimationFrame === "undefined") {
+      for (const move of moves) {
+        move.tile.y = move.toY;
+      }
+      this.dropMotions.clear();
+      return;
+    }
+    if (this.dropFrame === undefined) {
+      this.dropFrame = requestAnimationFrame(() => this.stepDropAnimation());
+    }
+  }
+
+  private stepDropAnimation(): void {
+    const duration = 190;
+    const now = Date.now();
+    let pending = false;
+    for (const [id, motion] of this.dropMotions) {
+      const progress = Math.min(1, (now - motion.startedAt) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      motion.tile.y = motion.fromY + (motion.toY - motion.fromY) * eased;
+      if (progress >= 1) {
+        this.dropMotions.delete(id);
+      } else {
+        pending = true;
+      }
+    }
+    this.render();
+    if (pending) {
+      this.dropFrame = requestAnimationFrame(() => this.stepDropAnimation());
+    } else {
+      this.dropFrame = undefined;
+    }
+  }
+
+  private cancelDropAnimation(): void {
+    if (this.dropFrame !== undefined && typeof cancelAnimationFrame !== "undefined") {
+      cancelAnimationFrame(this.dropFrame);
+    }
+    this.dropFrame = undefined;
+    this.dropMotions.clear();
   }
 
   private finishMove(): void {
