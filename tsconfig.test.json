@@ -8,6 +8,7 @@
   "include": [
     "src/game/Tile.ts",
     "src/game/SlotManager.ts",
+    "src/types/wechat-minigame.d.ts",
     "tests/**/*.ts"
   ]
 }
