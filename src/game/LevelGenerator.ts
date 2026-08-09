@@ -1,4 +1,5 @@
 import { ITEM_TYPES, type ItemType } from "../data/ItemConfig";
+import { PileLayout, type PileBounds } from "./PileLayout";
 import { Tile } from "./Tile";
 
 export const CHAPTER_NAMES = ["新手农场", "丰收田园", "疯狂农庄"] as const;
@@ -38,6 +39,16 @@ export function getSceneLayout(width: number, height: number): SceneLayout {
     centerY,
     radiusX,
     radiusY,
+  };
+}
+
+export function getPileBounds(width: number, height: number): PileBounds {
+  const { centerX, centerY, radiusX, radiusY } = getSceneLayout(width, height);
+  return {
+    left: centerX - radiusX + 14,
+    top: centerY - radiusY + 14,
+    right: centerX + radiusX - 14,
+    bottom: centerY + radiusY - 32,
   };
 }
 
@@ -111,10 +122,10 @@ class SeededRandom {
 }
 
 export class LevelGenerator {
+  private readonly pileLayout = new PileLayout();
+
   public generate(spec: LevelSpec, width: number, height: number): Tile[] {
     const random = new SeededRandom(spec.seed);
-    const layout = getSceneLayout(width, height);
-    const { sceneTop, sceneBottom, centerX, centerY } = layout;
     const densityScale = Math.max(0.74, 1 - Math.max(0, spec.id - 12) * 0.012);
     const tileSize = Math.min(62, Math.max(44, width * 0.15)) * densityScale;
     const tiles: Tile[] = [];
@@ -122,39 +133,29 @@ export class LevelGenerator {
 
     spec.layerCounts.forEach((count, layer) => {
       const tripletTypes = this.createTripletTypes(count, spec.itemTypes, random);
-      const positions = this.createLayerPositions(
-        count,
-        layer,
-        spec.layerCounts.length,
-        centerX,
-        centerY,
-        width,
-        tileSize,
-        random,
-        sceneTop,
-        sceneBottom,
-        layout.radiusX,
-        layout.radiusY,
-      );
 
       for (let index = 0; index < count; index += 1) {
-        const position = positions[index];
         const type = tripletTypes[index];
         const itemSize = tileSize * this.getSizeScale(type);
         tiles.push(
           new Tile({
             id: id++,
             type,
-            x: position.x + (tileSize - itemSize) / 2,
-            y: position.y + (tileSize - itemSize) / 2,
+            x: 0,
+            y: 0,
             width: itemSize,
             height: itemSize,
             layer,
-            rotation: position.rotation,
+            rotation: (random.next() - 0.5) * 1.05,
           }),
         );
       }
     });
+
+    for (const target of this.pileLayout.compute(tiles, getPileBounds(width, height))) {
+      target.tile.x = target.x;
+      target.tile.y = target.y;
+    }
 
     return tiles;
   }
@@ -199,50 +200,4 @@ export class LevelGenerator {
     return groups.reduce<ItemType[]>((result, group) => result.concat(group), []);
   }
 
-  private createLayerPositions(
-    count: number,
-    layer: number,
-    layerTotal: number,
-    centerX: number,
-    centerY: number,
-    width: number,
-    tileSize: number,
-    random: SeededRandom,
-    sceneTop: number,
-    sceneBottom: number,
-    containerRadiusX: number,
-    containerRadiusY: number,
-  ): Array<{ x: number; y: number; rotation: number }> {
-    const positions: Array<{ x: number; y: number; rotation: number }> = [];
-    const density = 1 - layer / Math.max(1, layerTotal - 1);
-    const radiusX = containerRadiusX * (0.18 + density * 0.68);
-    const radiusY = containerRadiusY * (0.18 + density * 0.68);
-    const safeHalfWidth = Math.max(28, containerRadiusX - tileSize * 0.72 - 14);
-    const safeHalfHeight = Math.max(28, containerRadiusY - tileSize * 0.58 - 24);
-    const minCenterX = centerX - safeHalfWidth;
-    const maxCenterX = centerX + safeHalfWidth;
-    const minCenterY = Math.max(sceneTop + tileSize / 2 + 4, centerY - safeHalfHeight);
-    const maxCenterY = Math.min(sceneBottom - tileSize / 2 - 4, centerY + safeHalfHeight);
-
-    for (let index = 0; index < count; index += 1) {
-      const spiral = Math.sqrt((index + 0.5) / Math.max(1, count));
-      const angle = index * 2.39996 + layer * 0.82;
-      const jitterX = (random.next() - 0.5) * tileSize * 0.72;
-      const jitterY = (random.next() - 0.5) * tileSize * 0.58;
-      let x = centerX + Math.cos(angle) * radiusX * spiral + jitterX - tileSize / 2;
-      let y = centerY + Math.sin(angle) * radiusY * spiral + jitterY - tileSize / 2;
-      const itemCenterX = x + tileSize / 2;
-      const itemCenterY = y + tileSize / 2;
-      const clampedCenterX = Math.max(minCenterX, Math.min(maxCenterX, itemCenterX));
-      const clampedCenterY = Math.max(minCenterY, Math.min(maxCenterY, itemCenterY));
-      x = clampedCenterX - tileSize / 2;
-      y = clampedCenterY - tileSize / 2;
-      positions.push({
-        x: Math.max(15, Math.min(width - tileSize - 15, x)),
-        y: Math.max(sceneTop + 4, Math.min(sceneBottom - tileSize - 4, y)),
-        rotation: (random.next() - 0.5) * 1.35,
-      });
-    }
-    return positions;
-  }
 }

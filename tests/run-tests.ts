@@ -2,8 +2,9 @@ import type { ItemType } from "../src/data/ItemConfig";
 import { BlockDetector } from "../src/game/BlockDetector";
 import { StorageManager } from "../src/core/StorageManager";
 import { DropSystem } from "../src/game/DropSystem";
-import { CHAPTER_NAMES, getSceneLayout, LEVEL_SPECS, LevelGenerator } from "../src/game/LevelGenerator";
+import { CHAPTER_NAMES, getPileBounds, getSceneLayout, LEVEL_SPECS, LevelGenerator } from "../src/game/LevelGenerator";
 import { GameManager } from "../src/core/GameManager";
+import { PileLayout, type PileBounds } from "../src/game/PileLayout";
 import { SlotManager } from "../src/game/SlotManager";
 import { Tile } from "../src/game/Tile";
 
@@ -118,14 +119,50 @@ test("重叠关系会更新但不会锁住下层物品", () => {
   expect(!lower.blocked, "移除上层后下层应恢复可点击");
 });
 
-test("清掉上层后重叠的下层会有落坠动画", () => {
-  const drop = new DropSystem(600);
-  const lower = createTile("apple", { x: 20, y: 100, layer: 0 });
-  const upper = createTile("corn", { x: 25, y: 105, layer: 1 });
-  const farAway = createTile("berry", { x: 220, y: 100, layer: 0 });
-  const moves = drop.release([lower, upper, farAway], upper);
-  expect(moves.length === 1, "只应检测到与清除物品实际重叠的下层");
-  expect(moves[0].tile.id === lower.id && moves[0].toY > moves[0].fromY, "下层物品应向下落位");
+test("拿走同层物品后旁边物品会补进空位", () => {
+  const bounds: PileBounds = { left: 0, top: 0, right: 260, bottom: 300 };
+  const tiles = [
+    createTile("apple", { layer: 0 }),
+    createTile("corn", { layer: 0 }),
+    createTile("berry", { layer: 0 }),
+    createTile("pumpkin", { layer: 0 }),
+    createTile("carrot", { layer: 0 }),
+  ];
+  for (const target of new PileLayout().compute(tiles, bounds)) {
+    target.tile.x = target.x;
+    target.tile.y = target.y;
+  }
+  const removed = tiles[1];
+  const following = tiles[2];
+  removed.removed = true;
+  const moves = new DropSystem(bounds).release(tiles, removed);
+  const followingMove = moves.find((move) => move.tile.id === following.id);
+  expect(followingMove !== undefined, "空位后面的物品应该参加挤压补位");
+  expect(
+    followingMove !== undefined
+      && (Math.abs(followingMove.toX - followingMove.fromX) > 0.5
+        || Math.abs(followingMove.toY - followingMove.fromY) > 0.5),
+    "旁边物品的位置应该发生变化",
+  );
+});
+
+test("最上层清空后下一层会整体向下落一格", () => {
+  const bounds: PileBounds = { left: 0, top: 0, right: 260, bottom: 300 };
+  const lowerTiles = [
+    createTile("apple", { layer: 0 }),
+    createTile("corn", { layer: 0 }),
+    createTile("berry", { layer: 0 }),
+  ];
+  const upper = createTile("pumpkin", { layer: 1 });
+  const tiles = [...lowerTiles, upper];
+  for (const target of new PileLayout().compute(tiles, bounds)) {
+    target.tile.x = target.x;
+    target.tile.y = target.y;
+  }
+  upper.removed = true;
+  const moves = new DropSystem(bounds).release(tiles, upper);
+  expect(moves.length === lowerTiles.length, "下一层的全部物品都应该一起下落");
+  expect(moves.every((move) => move.toY > move.fromY), "下一层应该保持层次并直向下落");
 });
 
 test("30关分为三章且每层都可组成三消", () => {
@@ -152,14 +189,15 @@ test("30关分为三章且每层都可组成三消", () => {
 
 test("矮屏设备会给底部操作区和盘面留出空间", () => {
   const layout = getSceneLayout(460, 735);
+  const pileBounds = getPileBounds(460, 735);
   const controlsTop = 735 - 206;
   expect(layout.sceneBottom < controlsTop, "盘面底部不应压住道具按钮");
-  expect(layout.centerY + layout.radiusY < controlsTop, "盘面椭圆不应进入底部操作区");
+  expect(layout.centerY + layout.radiusY < controlsTop, "长方体盘面不应进入底部操作区");
   const tiles = new LevelGenerator().generate(LEVEL_SPECS[5], 460, 735);
-  const minX = layout.centerX - layout.radiusX + 14;
-  const maxX = layout.centerX + layout.radiusX - 14;
-  const minY = layout.centerY - layout.radiusY + 14;
-  const maxY = layout.centerY + layout.radiusY - 32;
+  const minX = pileBounds.left;
+  const maxX = pileBounds.right;
+  const minY = pileBounds.top;
+  const maxY = pileBounds.bottom;
   for (const tile of tiles) {
     const centerX = tile.x + tile.width / 2;
     const centerY = tile.y + tile.height / 2;

@@ -1,7 +1,7 @@
 import { ITEM_TYPES, ITEM_VISUALS, type ItemType } from "../data/ItemConfig";
 import { BlockDetector } from "../game/BlockDetector";
 import { DropSystem } from "../game/DropSystem";
-import { CHAPTER_NAMES, getSceneLayout, LEVEL_SPECS, LevelGenerator } from "../game/LevelGenerator";
+import { CHAPTER_NAMES, getPileBounds, getSceneLayout, LEVEL_SPECS, LevelGenerator } from "../game/LevelGenerator";
 import { SlotManager } from "../game/SlotManager";
 import { Tile } from "../game/Tile";
 import { WechatRuntime, type TapPoint } from "../platform/WechatRuntime";
@@ -54,14 +54,21 @@ export class GameManager {
     shuffle: { ...EMPTY_RECT },
   };
   private toast = "";
-  private readonly dropMotions = new Map<number, { tile: Tile; fromY: number; toY: number; startedAt: number }>();
+  private readonly dropMotions = new Map<number, {
+    tile: Tile;
+    fromX: number;
+    fromY: number;
+    toX: number;
+    toY: number;
+    startedAt: number;
+  }>();
   private dropFrame: number | undefined;
 
   public constructor(private readonly runtime: WechatRuntime) {
     this.context = runtime.surface.context;
     this.width = runtime.surface.width;
     this.height = runtime.surface.height;
-    this.dropSystem = new DropSystem(getSceneLayout(this.width, this.height).sceneBottom);
+    this.dropSystem = new DropSystem(getPileBounds(this.width, this.height));
   }
 
   public start(): void {
@@ -220,17 +227,20 @@ export class GameManager {
     for (const move of moves) {
       this.dropMotions.set(move.tile.id, {
         tile: move.tile,
+        fromX: move.fromX,
         fromY: move.fromY,
+        toX: move.toX,
         toY: move.toY,
-        startedAt,
+        startedAt: startedAt + move.delay,
       });
     }
     this.toast = this.toast.includes("× 3")
-      ? `${this.toast} · 上层移开了，下面的物品落下来了`
-      : "上层移开了，下面的物品落下来了";
+      ? `${this.toast} · 空位正在向下补齐`
+      : "拿走一个，旁边物品向下挤压补位";
 
     if (typeof requestAnimationFrame === "undefined") {
       for (const move of moves) {
+        move.tile.x = move.toX;
         move.tile.y = move.toY;
       }
       this.dropMotions.clear();
@@ -242,12 +252,13 @@ export class GameManager {
   }
 
   private stepDropAnimation(): void {
-    const duration = 190;
+    const duration = 260;
     const now = Date.now();
     let pending = false;
     for (const [id, motion] of this.dropMotions) {
-      const progress = Math.min(1, (now - motion.startedAt) / duration);
+      const progress = Math.max(0, Math.min(1, (now - motion.startedAt) / duration));
       const eased = 1 - Math.pow(1 - progress, 3);
+      motion.tile.x = motion.fromX + (motion.toX - motion.fromX) * eased;
       motion.tile.y = motion.fromY + (motion.toY - motion.fromY) * eased;
       if (progress >= 1) {
         this.dropMotions.delete(id);
@@ -260,6 +271,7 @@ export class GameManager {
       this.dropFrame = requestAnimationFrame(() => this.stepDropAnimation());
     } else {
       this.dropFrame = undefined;
+      this.detector.recalculate(this.sceneTiles);
     }
   }
 
