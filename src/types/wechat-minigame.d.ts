@@ -68,6 +68,7 @@ interface WxMiniGameApi {
   createCanvas(): MiniGameCanvas;
   getSystemInfoSync(): MiniGameSystemInfo;
   onTouchStart(listener: (event: MiniGameTouchEvent) => void): void;
+  vibrateShort?(options?: { type?: "light" | "medium" | "heavy" }): void;
 }
 
 declare const wx: WxMiniGameApi;

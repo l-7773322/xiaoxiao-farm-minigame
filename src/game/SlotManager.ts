@@ -46,6 +46,18 @@ export class SlotManager {
     };
   }
 
+  public remove(tileId: number): Tile | undefined {
+    const index = this.tiles.findIndex((tile) => tile.id === tileId);
+    if (index === -1) {
+      return undefined;
+    }
+    return this.tiles.splice(index, 1)[0];
+  }
+
+  public countType(type: Tile["type"]): number {
+    return this.tiles.reduce((count, tile) => count + (tile.type === type ? 1 : 0), 0);
+  }
+
   public reset(): void {
     this.tiles.length = 0;
   }

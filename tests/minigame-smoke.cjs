@@ -3,6 +3,7 @@ const path = require("node:path");
 
 const drawnTexts = [];
 let touchListener;
+let vibrationCount = 0;
 
 const gradient = { addColorStop() {} };
 const context = new Proxy(
@@ -37,45 +38,28 @@ global.wx = {
   onTouchStart(listener) {
     touchListener = listener;
   },
+  vibrateShort() {
+    vibrationCount += 1;
+  },
 };
 
 require(path.resolve(__dirname, "..", "minigame", "game.js"));
 assert.equal(typeof touchListener, "function", "小游戏入口应注册触摸事件");
-assert(drawnTexts.includes("消消农场"), "首次渲染应绘制游戏标题");
-assert(drawnTexts.includes("测试关卡 · 剩余 12"), "首次渲染应显示 12 个剩余物品");
-
-const centers = [
-  [58, 176],
-  [144, 176],
-  [230, 176],
-  [316, 176],
-  [58, 262],
-  [144, 262],
-  [230, 262],
-  [316, 262],
-  [58, 348],
-  [144, 348],
-  [230, 348],
-  [316, 348],
-];
-
-function tap(index) {
-  const [clientX, clientY] = centers[index];
-  touchListener({ touches: [{ clientX, clientY }], changedTouches: [] });
-}
-
-for (const index of [0, 6, 9, 1, 4, 11, 2, 7, 8, 3, 5, 10]) {
-  tap(index);
-}
-assert(drawnTexts.includes("闯关成功"), "按四组三元组点击后应胜利");
+assert(drawnTexts.includes("消消农场"), "首页应绘制游戏标题");
+assert(drawnTexts.includes("开始挑战"), "首页应显示开始按钮");
+assert(drawnTexts.includes("12,638"), "首页应显示今日挑战人数");
 
 drawnTexts.length = 0;
-touchListener({ touches: [{ clientX: 187, clientY: 451 }], changedTouches: [] });
-assert(drawnTexts.includes("测试关卡 · 剩余 12"), "结果页重新开始按钮应重置关卡");
+touchListener({ touches: [{ clientX: 187, clientY: 661 }], changedTouches: [] });
+assert(drawnTexts.includes("第 1 关 · 热身小摊"), "点击开始后应进入第一关");
+assert(drawnTexts.some((text) => text.includes("剩余 18")), "第一关应有 18 个堆叠物品");
+assert(drawnTexts.includes("↥  移出"), "第一关应提供移出道具");
+assert(drawnTexts.includes("✦  凑齐"), "第一关应提供凑齐道具");
+assert(drawnTexts.includes("↻  打乱"), "第一关应提供打乱道具");
 
-for (const index of [0, 6, 1, 4, 2, 7, 3]) {
-  tap(index);
-}
-assert(drawnTexts.includes("槽位已满"), "七个未成组物品应触发失败");
+drawnTexts.length = 0;
+touchListener({ touches: [{ clientX: 187, clientY: 630 }], changedTouches: [] });
+assert(drawnTexts.includes("✦  凑齐 ✓"), "凑齐道具成功后应标记已使用");
+assert(vibrationCount > 0, "有效操作应触发轻触反馈");
 
-console.log("✓ 微信小游戏入口、胜利流程、失败流程冒烟测试通过");
+console.log("✓ 微信小游戏首页、首关堆叠、工具栏与触摸入口冒烟测试通过");

@@ -41,4 +41,8 @@ export class WechatRuntime {
       }
     });
   }
+
+  public vibrate(type: "light" | "medium" | "heavy" = "light"): void {
+    wx.vibrateShort?.({ type });
+  }
 }
