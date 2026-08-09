@@ -35,13 +35,16 @@ export class Tile {
   }
 
   public containsPoint(x: number, y: number): boolean {
-    return (
-      !this.removed &&
-      !this.blocked &&
-      x >= this.x &&
-      x <= this.x + this.width &&
-      y >= this.y &&
-      y <= this.y + this.height
-    );
+    if (this.removed) {
+      return false;
+    }
+
+    const centerX = this.x + this.width / 2;
+    const centerY = this.y + this.height / 2;
+    const radiusX = this.width * 0.43;
+    const radiusY = this.height * 0.43;
+    const normalizedX = (x - centerX) / radiusX;
+    const normalizedY = (y - centerY) / radiusY;
+    return normalizedX * normalizedX + normalizedY * normalizedY <= 1;
   }
 }

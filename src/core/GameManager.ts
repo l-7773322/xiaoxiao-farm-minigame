@@ -74,7 +74,7 @@ export class GameManager {
     this.temporaryTiles = [];
     this.temporaryRects = [];
     this.toolUsed = { moveOut: false, gather: false, shuffle: false };
-    this.toast = index === 0 ? "先消掉上层能点的物品" : "第二关物品更多，别塞满槽位";
+    this.toast = index === 0 ? "所有物品都能拿，点准露出的图案" : "物品重叠也能拿，别塞满槽位";
     this.sceneTiles = this.generator.generate(LEVEL_SPECS[index], this.width, this.height);
     this.initialTileCount = this.sceneTiles.length;
     this.detector.recalculate(this.sceneTiles);
@@ -126,12 +126,10 @@ export class GameManager {
       }
     }
 
-    const tile = [...this.sceneTiles]
-      .sort((left, right) => right.layer - left.layer || right.id - left.id)
-      .find((candidate) => candidate.containsPoint(point.x, point.y));
+    const tile = this.findClosestTile(point);
 
     if (!tile) {
-      this.toast = "这个物品还被压着，先清掉上层";
+      this.toast = "点准物品露出的部分，就能直接拿走";
       this.render();
       return;
     }
@@ -139,6 +137,19 @@ export class GameManager {
     this.collectTile(tile);
     this.detector.recalculate(this.sceneTiles);
     this.finishMove();
+  }
+
+  private findClosestTile(point: TapPoint): Tile | undefined {
+    return this.sceneTiles
+      .filter((tile) => tile.containsPoint(point.x, point.y))
+      .sort((left, right) => {
+        const leftX = left.x + left.width / 2 - point.x;
+        const leftY = left.y + left.height / 2 - point.y;
+        const rightX = right.x + right.width / 2 - point.x;
+        const rightY = right.y + right.height / 2 - point.y;
+        const distanceDifference = leftX * leftX + leftY * leftY - rightX * rightX - rightY * rightY;
+        return distanceDifference || right.layer - left.layer || right.id - left.id;
+      })[0];
   }
 
   private collectTile(tile: Tile): boolean {
@@ -213,12 +224,12 @@ export class GameManager {
   }
 
   private gatherTriplet(): boolean {
-    const exposed = this.sceneTiles.filter((tile) => !tile.removed && !tile.blocked);
+    const availableTiles = this.sceneTiles.filter((tile) => !tile.removed);
     const capacityLeft = this.slots.capacity - this.slots.size;
     const candidates = ITEM_TYPES.map((type) => {
       const inSlot = this.slots.countType(type);
       const need = 3 - inSlot;
-      const available = exposed.filter((tile) => tile.type === type);
+      const available = availableTiles.filter((tile) => tile.type === type);
       return { type, inSlot, need, available };
     })
       .filter((candidate) => candidate.need <= capacityLeft && candidate.available.length >= candidate.need)
@@ -468,7 +479,6 @@ export class GameManager {
         tile.y + tile.height / 2,
         tile.width * 0.9,
         tile.rotation,
-        tile.blocked,
       );
     }
   }

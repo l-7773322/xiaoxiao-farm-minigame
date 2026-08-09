@@ -53,6 +53,7 @@ drawnTexts.length = 0;
 touchListener({ touches: [{ clientX: 187, clientY: 661 }], changedTouches: [] });
 assert(drawnTexts.includes("第 1 关 · 热身小摊"), "点击开始后应进入第一关");
 assert(drawnTexts.some((text) => text.includes("剩余 18")), "第一关应有 18 个堆叠物品");
+assert(drawnTexts.includes("所有物品都能拿，点准露出的图案"), "首关应明确提示重叠物品也可抓取");
 assert(drawnTexts.includes("↥  移出"), "第一关应提供移出道具");
 assert(drawnTexts.includes("✦  凑齐"), "第一关应提供凑齐道具");
 assert(drawnTexts.includes("↻  打乱"), "第一关应提供打乱道具");

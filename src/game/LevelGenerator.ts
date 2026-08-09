@@ -74,14 +74,16 @@ export class LevelGenerator {
 
       for (let index = 0; index < count; index += 1) {
         const position = positions[index];
+        const type = tripletTypes[index];
+        const itemSize = tileSize * this.getSizeScale(type);
         tiles.push(
           new Tile({
             id: id++,
-            type: tripletTypes[index],
-            x: position.x,
-            y: position.y,
-            width: tileSize,
-            height: tileSize,
+            type,
+            x: position.x + (tileSize - itemSize) / 2,
+            y: position.y + (tileSize - itemSize) / 2,
+            width: itemSize,
+            height: itemSize,
             layer,
             rotation: position.rotation,
           }),
@@ -90,6 +92,24 @@ export class LevelGenerator {
     });
 
     return tiles;
+  }
+
+  private getSizeScale(type: ItemType): number {
+    const scales: Record<ItemType, number> = {
+      apple: 1.02,
+      corn: 0.94,
+      pumpkin: 1.18,
+      berry: 0.9,
+      carrot: 0.94,
+      eggplant: 1.04,
+      mushroom: 1.12,
+      milk: 0.92,
+      bread: 1.08,
+      egg: 0.84,
+      pepper: 1,
+      potato: 1.12,
+    };
+    return scales[type];
   }
 
   private createTripletTypes(

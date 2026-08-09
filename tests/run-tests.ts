@@ -102,12 +102,13 @@ test("指定物品可以移出槽位", () => {
   expectTypes(slots, ["corn"]);
 });
 
-test("上层重叠物品会遮挡下层，移除后自动解锁", () => {
+test("重叠关系会更新但不会锁住下层物品", () => {
   const detector = new BlockDetector();
   const lower = createTile("apple", { x: 20, y: 20, layer: 0 });
   const upper = createTile("corn", { x: 25, y: 25, layer: 1 });
   detector.recalculate([lower, upper]);
   expect(lower.blocked, "下层重叠物品应被标记为遮挡");
+  expect(lower.containsPoint(45, 45), "重叠只记录层级，不应锁住下层物品的点击");
   expect(!upper.blocked, "最上层物品应可点击");
   upper.removed = true;
   detector.recalculate([lower, upper]);
