@@ -66,10 +66,15 @@ export class PileLayout {
         const row = Math.floor(sequence / columns);
         const column = sequence % columns;
         const rowCount = Math.min(columns, layerTiles.length - row * columns);
+        const flowsLeftToRight = (row + layer) % 2 === 0;
+        const packedColumn = flowsLeftToRight ? column : rowCount - 1 - column;
         const rowWidth = maximumWidth + Math.max(0, rowCount - 1) * stepX;
-        const unclampedX = centerX - rowWidth / 2 + column * stepX + layerShift
+        const rowShift = (((row + layer) % 3) - 1) * stepX * 0.16;
+        const jitterX = (this.slotNoise(layer, row, packedColumn, 17) - 0.5) * stepX * 0.42;
+        const jitterY = (this.slotNoise(layer, row, packedColumn, 43) - 0.5) * stepY * 0.46;
+        const unclampedX = centerX - rowWidth / 2 + packedColumn * stepX + layerShift + rowShift + jitterX
           + (maximumWidth - tile.width) / 2;
-        const unclampedY = rowBottom - row * stepY + (maximumHeight - tile.height) / 2;
+        const unclampedY = rowBottom - row * stepY + jitterY + (maximumHeight - tile.height) / 2;
         targets.push({
           tile,
           x: this.clamp(unclampedX, bounds.left + 4, bounds.right - tile.width - 4),
@@ -85,5 +90,15 @@ export class PileLayout {
 
   private clamp(value: number, minimum: number, maximum: number): number {
     return Math.max(minimum, Math.min(maximum, value));
+  }
+
+  private slotNoise(layer: number, row: number, column: number, salt: number): number {
+    let value = (layer + 11) * 73856093
+      ^ (row + 17) * 19349663
+      ^ (column + 23) * 83492791
+      ^ salt * 2654435761;
+    value = Math.imul(value ^ (value >>> 16), 2246822507);
+    value = Math.imul(value ^ (value >>> 13), 3266489909);
+    return ((value ^ (value >>> 16)) >>> 0) / 4294967296;
   }
 }

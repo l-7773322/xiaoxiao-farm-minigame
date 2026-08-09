@@ -193,11 +193,12 @@ export class LevelGenerator {
       groups.push([type, type, type]);
     }
 
-    for (let index = groups.length - 1; index > 0; index -= 1) {
+    const shuffled = groups.reduce<ItemType[]>((result, group) => result.concat(group), []);
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
       const target = Math.floor(random.next() * (index + 1));
-      [groups[index], groups[target]] = [groups[target], groups[index]];
+      [shuffled[index], shuffled[target]] = [shuffled[target], shuffled[index]];
     }
-    return groups.reduce<ItemType[]>((result, group) => result.concat(group), []);
+    return shuffled;
   }
 
 }

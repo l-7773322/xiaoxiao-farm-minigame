@@ -146,6 +146,31 @@ test("拿走同层物品后旁边物品会补进空位", () => {
   );
 });
 
+test("相邻行会从左右两个方向交错补位", () => {
+  const bounds: PileBounds = { left: 0, top: 0, right: 260, bottom: 300 };
+  const createRowSet = (): Tile[] => Array.from({ length: 14 }, () => createTile("apple", { layer: 0 }));
+  const place = (tiles: Tile[]): void => {
+    for (const target of new PileLayout().compute(tiles, bounds)) {
+      target.tile.x = target.x;
+      target.tile.y = target.y;
+    }
+  };
+
+  const firstRow = createRowSet();
+  place(firstRow);
+  firstRow[0].removed = true;
+  const leftMove = new DropSystem(bounds).release(firstRow, firstRow[0])
+    .find((move) => move.tile.id === firstRow[1].id);
+  expect(leftMove !== undefined && leftMove.toX < leftMove.fromX, "一行应该能从右向左补位");
+
+  const secondRow = createRowSet();
+  place(secondRow);
+  secondRow[7].removed = true;
+  const rightMove = new DropSystem(bounds).release(secondRow, secondRow[7])
+    .find((move) => move.tile.id === secondRow[8].id);
+  expect(rightMove !== undefined && rightMove.toX > rightMove.fromX, "相邻行应该能从左向右补位");
+});
+
 test("最上层清空后下一层会整体向下落一格", () => {
   const bounds: PileBounds = { left: 0, top: 0, right: 260, bottom: 300 };
   const lowerTiles = [
@@ -185,6 +210,14 @@ test("30关分为三章且每层都可组成三消", () => {
       }
     });
   }
+  const thirdLevelFirstLayer = generator.generate(LEVEL_SPECS[2], 375, 812)
+    .filter((tile) => tile.layer === 0)
+    .map((tile) => tile.type);
+  const patternedTriplets = Array.from(
+    { length: Math.floor(thirdLevelFirstLayer.length / 3) },
+    (_, index) => thirdLevelFirstLayer.slice(index * 3, index * 3 + 3),
+  ).filter((group) => group[0] === group[1] && group[1] === group[2]);
+  expect(patternedTriplets.length < 2, "同类三件物品不应继续按整组三连规律排放");
 });
 
 test("矮屏设备会给底部操作区和盘面留出空间", () => {

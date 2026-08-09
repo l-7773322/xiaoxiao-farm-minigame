@@ -103,12 +103,12 @@ assert(drawnTexts.some((text) => text.includes("✦  凑齐 1次")), "第一关�
 assert(drawnTexts.some((text) => text.includes("↻  打乱 1次")), "第一关应提供 1 次打乱道具");
 
 drawnTexts.length = 0;
-tap(83, 512);
+tap(90, 512);
 assert(drawnTexts.some((text) => text.includes("剩余 17")), "普通点击应取走一个物品");
 assert.equal(soundPlayCount, 1, "每次成功点击物品应播放一次音效");
 
-tap(104, 512);
-tap(125, 512);
+tap(111, 512);
+tap(132, 512);
 assert(drawnTexts.some((text) => text.includes("× 3，消除！")), "三个相同物品应形成三消");
 assert.equal(soundPlayCount, 3, "三次成功点击应播放三次对应音效");
 
