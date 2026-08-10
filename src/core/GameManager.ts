@@ -1,5 +1,4 @@
 import { ITEM_TYPES, ITEM_VISUALS, type ItemType } from "../data/ItemConfig";
-import { BlockDetector } from "../game/BlockDetector";
 import { DropSystem } from "../game/DropSystem";
 import { CHAPTER_NAMES, getPileBounds, getSceneLayout, LEVEL_SPECS, LevelGenerator } from "../game/LevelGenerator";
 import { SlotManager } from "../game/SlotManager";
@@ -23,7 +22,6 @@ const EMPTY_RECT: Rect = { x: 0, y: 0, width: 0, height: 0 };
 
 export class GameManager {
   private readonly slots = new SlotManager(7);
-  private readonly detector = new BlockDetector();
   private readonly dropSystem: DropSystem;
   private readonly generator = new LevelGenerator();
   private readonly storage = new StorageManager();
@@ -103,7 +101,6 @@ export class GameManager {
     this.toast = index === 0 ? "点准露出的图案，三个相同就消除" : "只能点露在最上面的物品表面";
     this.sceneTiles = this.generator.generate(LEVEL_SPECS[index], this.width, this.height);
     this.initialTileCount = this.sceneTiles.length;
-    this.detector.recalculate(this.sceneTiles);
     this.render();
   }
 
@@ -155,7 +152,6 @@ export class GameManager {
       const temporaryTile = this.temporaryTiles[temporaryIndex];
       if (this.collectTile(temporaryTile)) {
         this.temporaryTiles.splice(temporaryIndex, 1);
-        this.detector.recalculate(this.sceneTiles);
         this.finishMove();
       } else {
         this.toast = "收集槽已满，暂存物品还放不回来";
@@ -180,7 +176,6 @@ export class GameManager {
     }
 
     this.collectTile(tile);
-    this.detector.recalculate(this.sceneTiles);
     this.finishMove();
   }
 
@@ -211,6 +206,7 @@ export class GameManager {
   }
 
   private queueDrop(removedTile: Tile): void {
+    this.settleDropAnimation();
     const moves = this.dropSystem.release(this.sceneTiles, removedTile);
     if (moves.length === 0) {
       return;
@@ -228,8 +224,8 @@ export class GameManager {
       });
     }
     this.toast = this.toast.includes("× 3")
-      ? `${this.toast} · 空位正在向下补齐`
-      : "拿走一个，旁边物品向下挤压补位";
+      ? `${this.toast} · 空位正在同步挤压补位`
+      : "空位附近物品正同步挤压补位";
 
     if (typeof requestAnimationFrame === "undefined") {
       for (const move of moves) {
@@ -237,7 +233,6 @@ export class GameManager {
         move.tile.y = move.toY;
       }
       this.dropMotions.clear();
-      this.detector.recalculate(this.sceneTiles);
       return;
     }
     if (this.dropFrame === undefined) {
@@ -246,7 +241,7 @@ export class GameManager {
   }
 
   private stepDropAnimation(): void {
-    const duration = 210;
+    const duration = 150;
     const now = Date.now();
     let pending = false;
     for (const [id, motion] of this.dropMotions) {
@@ -260,7 +255,7 @@ export class GameManager {
         pending = true;
       }
     }
-    if (!pending || now - this.lastDropRenderAt >= 24) {
+    if (!pending || now - this.lastDropRenderAt >= 33) {
       this.render();
       this.lastDropRenderAt = now;
     }
@@ -268,8 +263,18 @@ export class GameManager {
       this.dropFrame = requestAnimationFrame(() => this.stepDropAnimation());
     } else {
       this.dropFrame = undefined;
-      this.detector.recalculate(this.sceneTiles);
     }
+  }
+
+  private settleDropAnimation(): void {
+    if (this.dropMotions.size === 0) {
+      return;
+    }
+    for (const motion of this.dropMotions.values()) {
+      motion.tile.x = motion.toX;
+      motion.tile.y = motion.toY;
+    }
+    this.cancelDropAnimation();
   }
 
   private cancelDropAnimation(): void {
@@ -278,6 +283,7 @@ export class GameManager {
     }
     this.dropFrame = undefined;
     this.dropMotions.clear();
+    this.lastDropRenderAt = 0;
   }
 
   private finishMove(): void {
@@ -310,7 +316,6 @@ export class GameManager {
 
     if (successful) {
       this.toolRemaining[name] -= 1;
-      this.detector.recalculate(this.sceneTiles);
       this.finishMove();
     } else {
       this.render();
@@ -739,9 +744,8 @@ export class GameManager {
   }
 
   private drawScene(): void {
-    const visible = this.sceneTiles
-      .filter((tile) => !tile.removed)
-      .sort((left, right) => left.layer - right.layer || left.id - right.id);
+    const activeCount = this.sceneTiles.reduce((count, tile) => count + (tile.removed ? 0 : 1), 0);
+    const detail = activeCount > 130 ? "dense" : "full";
     const { centerX, centerY, radiusX, radiusY } = getSceneLayout(this.width, this.height);
     const left = centerX - radiusX + 14;
     const top = centerY - radiusY + 14;
@@ -750,7 +754,10 @@ export class GameManager {
     this.context.save();
     roundedRect(this.context, left, top, width, height, 10);
     this.context.clip();
-    for (const tile of visible) {
+    for (const tile of this.sceneTiles) {
+      if (tile.removed) {
+        continue;
+      }
       drawItemIcon(
         this.context,
         tile.type,
@@ -758,6 +765,8 @@ export class GameManager {
         tile.y + tile.height / 2,
         tile.width * 0.9,
         tile.rotation,
+        false,
+        detail,
       );
     }
     this.context.restore();

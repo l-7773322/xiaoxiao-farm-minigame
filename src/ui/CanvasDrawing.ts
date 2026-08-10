@@ -1,6 +1,7 @@
 import { ITEM_VISUALS, type ItemType } from "../data/ItemConfig";
 
 type ItemGradient = ReturnType<MiniGameCanvasContext2D["createLinearGradient"]>;
+type ItemRenderDetail = "full" | "dense";
 
 const itemGradientCache = new WeakMap<object, Map<string, ItemGradient>>();
 const itemToneCache = new Map<string, { light: string; dark: string; side: string }>();
@@ -35,30 +36,36 @@ export function drawItemIcon(
   size: number,
   rotation = 0,
   blocked = false,
+  detail: ItemRenderDetail = "full",
 ): void {
   const visual = ITEM_VISUALS[type];
+  const dense = detail === "dense";
   context.save();
   context.translate(centerX, centerY);
   context.rotate(rotation);
   context.globalAlpha = blocked ? 0.5 : 1;
-  context.shadowColor = blocked ? "rgba(36, 44, 36, 0.15)" : "rgba(45, 42, 25, 0.3)";
-  context.shadowBlur = blocked ? 2 : 7;
-  context.shadowOffsetY = blocked ? 1 : 4;
-  drawItemShadow(context, size);
+  context.shadowColor = dense ? "transparent" : blocked ? "rgba(36, 44, 36, 0.15)" : "rgba(45, 42, 25, 0.3)";
+  context.shadowBlur = dense ? 0 : blocked ? 2 : 7;
+  context.shadowOffsetY = dense ? 0 : blocked ? 1 : 4;
+  if (!dense) {
+    drawItemShadow(context, size);
+  }
 
   const tones = getItemTones(visual.color);
   context.save();
   context.translate(size * 0.055, size * 0.085);
   context.globalAlpha = blocked ? 0.3 : 0.66;
-  context.shadowBlur = 1;
-  context.shadowOffsetY = 1;
+  context.shadowBlur = dense ? 0 : 1;
+  context.shadowOffsetY = dense ? 0 : 1;
   context.fillStyle = tones.side;
   drawItemShape(context, type, size, tones.side);
   context.restore();
 
   context.fillStyle = createItemGradient(context, visual.color, size);
   drawItemShape(context, type, size, visual.accent);
-  drawItemHighlight(context, size);
+  if (!dense) {
+    drawItemHighlight(context, size);
+  }
 
   if (blocked) {
     context.shadowBlur = 0;

@@ -13,6 +13,22 @@ import { drawItemIcon } from "../src/ui/CanvasDrawing";
 let nextId = 1;
 let passed = 0;
 
+test("局部挤压只影响空位附近的物品，并从两侧同时靠拢", () => {
+  const bounds: PileBounds = { left: 0, top: 0, right: 320, bottom: 300 };
+  const removed = createTile("apple", { x: 136, y: 120, layer: 0 });
+  const left = createTile("corn", { x: 80, y: 120, layer: 0 });
+  const right = createTile("berry", { x: 192, y: 120, layer: 0 });
+  const far = createTile("pumpkin", { x: 266, y: 120, layer: 0 });
+  removed.removed = true;
+  const moves = new DropSystem(bounds).release([removed, left, right, far], removed);
+  const leftMove = moves.find((move) => move.tile.id === left.id);
+  const rightMove = moves.find((move) => move.tile.id === right.id);
+  expect(leftMove !== undefined && leftMove.toX > leftMove.fromX, "左侧邻居应朝空位移动");
+  expect(rightMove !== undefined && rightMove.toX < rightMove.fromX, "右侧邻居应朝空位移动");
+  expect(!moves.some((move) => move.tile.id === far.id), "远处物品不应参与重排");
+  expect(moves.every((move) => move.delay === 0), "局部挤压应在同一时刻启动");
+});
+
 function createTile(type: ItemType, options: Partial<{ x: number; y: number; layer: number }> = {}): Tile {
   return new Tile({
     id: nextId++,
