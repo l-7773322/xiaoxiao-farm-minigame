@@ -107,10 +107,9 @@ tap(90, 512);
 assert(drawnTexts.some((text) => text.includes("剩余 17")), "普通点击应取走一个物品");
 assert.equal(soundPlayCount, 1, "每次成功点击物品应播放一次音效");
 
-tap(111, 512);
-tap(132, 512);
-assert(drawnTexts.some((text) => text.includes("× 3，消除！")), "三个相同物品应形成三消");
-assert.equal(soundPlayCount, 3, "三次成功点击应播放三次对应音效");
+tap(187, 606);
+assert(drawnTexts.some((text) => text.startsWith("已帮你凑齐")), "凑齐道具应形成三个相同物品的三消");
+assert.equal(soundPlayCount, 3, "凑齐两个相同物品后应共播放三次对应音效");
 
 drawnTexts.length = 0;
 tap(318, 606);

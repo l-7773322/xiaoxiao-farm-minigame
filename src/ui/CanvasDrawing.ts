@@ -1,5 +1,10 @@
 import { ITEM_VISUALS, type ItemType } from "../data/ItemConfig";
 
+type ItemGradient = ReturnType<MiniGameCanvasContext2D["createLinearGradient"]>;
+
+const itemGradientCache = new WeakMap<object, Map<string, ItemGradient>>();
+const itemToneCache = new Map<string, { light: string; dark: string; side: string }>();
+
 export function roundedRect(
   context: MiniGameCanvasContext2D,
   x: number,
@@ -41,14 +46,14 @@ export function drawItemIcon(
   context.shadowOffsetY = blocked ? 1 : 4;
   drawItemShadow(context, size);
 
-  const sideColor = blendColor(visual.color, "#382719", 0.52);
+  const tones = getItemTones(visual.color);
   context.save();
   context.translate(size * 0.055, size * 0.085);
   context.globalAlpha = blocked ? 0.3 : 0.66;
   context.shadowBlur = 1;
   context.shadowOffsetY = 1;
-  context.fillStyle = sideColor;
-  drawItemShape(context, type, size, sideColor);
+  context.fillStyle = tones.side;
+  drawItemShape(context, type, size, tones.side);
   context.restore();
 
   context.fillStyle = createItemGradient(context, visual.color, size);
@@ -138,11 +143,38 @@ function createItemGradient(
   color: string,
   size: number,
 ) {
+  const key = `${color}:${Math.round(size * 10)}`;
+  const cacheKey = context as unknown as object;
+  let gradients = itemGradientCache.get(cacheKey);
+  if (!gradients) {
+    gradients = new Map<string, ItemGradient>();
+    itemGradientCache.set(cacheKey, gradients);
+  }
+  const cached = gradients.get(key);
+  if (cached) {
+    return cached;
+  }
   const gradient = context.createLinearGradient(-size * 0.34, -size * 0.38, size * 0.34, size * 0.4);
-  gradient.addColorStop(0, blendColor(color, "#fff7db", 0.34));
+  const tones = getItemTones(color);
+  gradient.addColorStop(0, tones.light);
   gradient.addColorStop(0.46, color);
-  gradient.addColorStop(1, blendColor(color, "#452d1b", 0.3));
+  gradient.addColorStop(1, tones.dark);
+  gradients.set(key, gradient);
   return gradient;
+}
+
+function getItemTones(color: string): { light: string; dark: string; side: string } {
+  const cached = itemToneCache.get(color);
+  if (cached) {
+    return cached;
+  }
+  const tones = {
+    light: blendColor(color, "#fff7db", 0.34),
+    dark: blendColor(color, "#452d1b", 0.3),
+    side: blendColor(color, "#382719", 0.52),
+  };
+  itemToneCache.set(color, tones);
+  return tones;
 }
 
 function blendColor(source: string, target: string, amount: number): string {

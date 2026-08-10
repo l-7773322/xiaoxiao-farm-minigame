@@ -187,18 +187,40 @@ export class LevelGenerator {
       throw new Error("每一层的物品数量必须是 3 的倍数");
     }
 
-    const groups: ItemType[][] = [];
-    for (let index = 0; index < count / 3; index += 1) {
-      const type = random.pick(itemTypes);
-      groups.push([type, type, type]);
+    const counts = new Map<ItemType, number>();
+    let groupCount = 0;
+    while (groupCount < count / 3) {
+      const cycle = [...itemTypes];
+      this.shuffle(cycle, random);
+      for (const type of cycle) {
+        if (groupCount >= count / 3) {
+          break;
+        }
+        counts.set(type, (counts.get(type) ?? 0) + 3);
+        groupCount += 1;
+      }
     }
 
-    const shuffled = groups.reduce<ItemType[]>((result, group) => result.concat(group), []);
-    for (let index = shuffled.length - 1; index > 0; index -= 1) {
-      const target = Math.floor(random.next() * (index + 1));
-      [shuffled[index], shuffled[target]] = [shuffled[target], shuffled[index]];
+    const shuffled: ItemType[] = [];
+    while (shuffled.length < count) {
+      const recent = shuffled.slice(-2);
+      const available = itemTypes.filter((type) => (counts.get(type) ?? 0) > 0);
+      const varied = available.filter((type) => !recent.includes(type));
+      const candidates = varied.length > 0 ? varied : available;
+      const mostRemaining = Math.max(...candidates.map((type) => counts.get(type) ?? 0));
+      const balanced = candidates.filter((type) => (counts.get(type) ?? 0) === mostRemaining);
+      const type = random.pick(balanced);
+      shuffled.push(type);
+      counts.set(type, (counts.get(type) ?? 0) - 1);
     }
     return shuffled;
+  }
+
+  private shuffle<T>(values: T[], random: SeededRandom): void {
+    for (let index = values.length - 1; index > 0; index -= 1) {
+      const target = Math.floor(random.next() * (index + 1));
+      [values[index], values[target]] = [values[target], values[index]];
+    }
   }
 
 }

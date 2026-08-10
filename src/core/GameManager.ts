@@ -3,6 +3,7 @@ import { BlockDetector } from "../game/BlockDetector";
 import { DropSystem } from "../game/DropSystem";
 import { CHAPTER_NAMES, getPileBounds, getSceneLayout, LEVEL_SPECS, LevelGenerator } from "../game/LevelGenerator";
 import { SlotManager } from "../game/SlotManager";
+import { pickVisibleSurface } from "../game/SurfacePicker";
 import { Tile } from "../game/Tile";
 import { WechatRuntime, type TapPoint } from "../platform/WechatRuntime";
 import { drawItemIcon, drawMascot, roundedRect } from "../ui/CanvasDrawing";
@@ -63,6 +64,7 @@ export class GameManager {
     startedAt: number;
   }>();
   private dropFrame: number | undefined;
+  private lastDropRenderAt = 0;
 
   public constructor(private readonly runtime: WechatRuntime) {
     this.context = runtime.surface.context;
@@ -98,7 +100,7 @@ export class GameManager {
     this.temporaryTiles = [];
     this.temporaryRects = [];
     this.toolRemaining = { moveOut: 1, gather: 1, shuffle: 1 };
-    this.toast = index === 0 ? "点准露出的图案，三个相同就消除" : "物品重叠也能拿，注意槽位组合";
+    this.toast = index === 0 ? "点准露出的图案，三个相同就消除" : "只能点露在最上面的物品表面";
     this.sceneTiles = this.generator.generate(LEVEL_SPECS[index], this.width, this.height);
     this.initialTileCount = this.sceneTiles.length;
     this.detector.recalculate(this.sceneTiles);
@@ -172,7 +174,7 @@ export class GameManager {
     const tile = this.findClosestTile(point);
 
     if (!tile) {
-      this.toast = "点准物品露出的部分，就能直接拿走";
+      this.toast = "这里被上层物品挡住了，换一块露出的表面";
       this.render();
       return;
     }
@@ -183,16 +185,7 @@ export class GameManager {
   }
 
   private findClosestTile(point: TapPoint): Tile | undefined {
-    return this.sceneTiles
-      .filter((tile) => tile.containsPoint(point.x, point.y))
-      .sort((left, right) => {
-        const leftX = left.x + left.width / 2 - point.x;
-        const leftY = left.y + left.height / 2 - point.y;
-        const rightX = right.x + right.width / 2 - point.x;
-        const rightY = right.y + right.height / 2 - point.y;
-        const distanceDifference = leftX * leftX + leftY * leftY - rightX * rightX - rightY * rightY;
-        return distanceDifference || right.layer - left.layer || right.id - left.id;
-      })[0];
+    return pickVisibleSurface(this.sceneTiles, point);
   }
 
   private collectTile(tile: Tile): boolean {
@@ -244,6 +237,7 @@ export class GameManager {
         move.tile.y = move.toY;
       }
       this.dropMotions.clear();
+      this.detector.recalculate(this.sceneTiles);
       return;
     }
     if (this.dropFrame === undefined) {
@@ -252,7 +246,7 @@ export class GameManager {
   }
 
   private stepDropAnimation(): void {
-    const duration = 260;
+    const duration = 210;
     const now = Date.now();
     let pending = false;
     for (const [id, motion] of this.dropMotions) {
@@ -266,7 +260,10 @@ export class GameManager {
         pending = true;
       }
     }
-    this.render();
+    if (!pending || now - this.lastDropRenderAt >= 24) {
+      this.render();
+      this.lastDropRenderAt = now;
+    }
     if (pending) {
       this.dropFrame = requestAnimationFrame(() => this.stepDropAnimation());
     } else {

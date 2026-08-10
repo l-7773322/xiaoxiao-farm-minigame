@@ -6,6 +6,7 @@ import { CHAPTER_NAMES, getPileBounds, getSceneLayout, LEVEL_SPECS, LevelGenerat
 import { GameManager } from "../src/core/GameManager";
 import { PileLayout, type PileBounds } from "../src/game/PileLayout";
 import { SlotManager } from "../src/game/SlotManager";
+import { pickVisibleSurface } from "../src/game/SurfacePicker";
 import { Tile } from "../src/game/Tile";
 import { drawItemIcon } from "../src/ui/CanvasDrawing";
 
@@ -64,6 +65,8 @@ test("所有农场物品都能绘制立体明暗", () => {
     drawItemIcon(context, type, 96, 96, 64, 0.18);
   }
   expect(gradientStops === ITEM_TYPES.length * 3, "每个物品都应包含受光、主色和暗侧三段渐变");
+  drawItemIcon(context, "apple", 96, 96, 64, 0.18);
+  expect(gradientStops === ITEM_TYPES.length * 3, "重复绘制同尺寸物品应复用渐变以保持流畅");
 });
 
 test("三个相同物品自动消除", () => {
@@ -132,17 +135,18 @@ test("指定物品可以移出槽位", () => {
   expectTypes(slots, ["corn"]);
 });
 
-test("重叠关系会更新但不会锁住下层物品", () => {
+test("只有露出的最上层表面可以被点击", () => {
   const detector = new BlockDetector();
   const lower = createTile("apple", { x: 20, y: 20, layer: 0 });
   const upper = createTile("corn", { x: 25, y: 25, layer: 1 });
   detector.recalculate([lower, upper]);
   expect(lower.blocked, "下层重叠物品应被标记为遮挡");
-  expect(lower.containsPoint(45, 45), "重叠只记录层级，不应锁住下层物品的点击");
-  expect(!upper.blocked, "最上层物品应可点击");
+  expect(pickVisibleSurface([lower, upper], { x: 45, y: 45 })?.id === upper.id, "覆盖区域只能选中上层表面");
+  expect(pickVisibleSurface([lower, upper], { x: 32, y: 36 })?.id === lower.id, "露出的下层边缘仍应可以点击");
   upper.removed = true;
   detector.recalculate([lower, upper]);
   expect(!lower.blocked, "移除上层后下层应恢复可点击");
+  expect(pickVisibleSurface([lower, upper], { x: 45, y: 45 })?.id === lower.id, "上层移除后应选中下层表面");
 });
 
 test("拿走同层物品后旁边物品会补进空位", () => {
@@ -170,6 +174,7 @@ test("拿走同层物品后旁边物品会补进空位", () => {
         || Math.abs(followingMove.toY - followingMove.fromY) > 0.5),
     "旁边物品的位置应该发生变化",
   );
+  expect(moves.every((move) => move.delay === 0), "同层补位应该同时开始，不应逐个排队移动");
 });
 
 test("相邻行会从左右两个方向交错补位", () => {
@@ -234,6 +239,9 @@ test("30关分为三章且每层都可组成三消", () => {
         const count = layerTiles.filter((tile) => tile.type === type).length;
         expect(count % 3 === 0, `${spec.name} 第 ${layer} 层的 ${type} 不是三的倍数`);
       }
+      for (let index = 1; index < layerTiles.length; index += 1) {
+        expect(layerTiles[index].type !== layerTiles[index - 1].type, `${spec.name} 同类物品不应连续堆在一起`);
+      }
     });
   }
   const thirdLevelFirstLayer = generator.generate(LEVEL_SPECS[2], 375, 812)
@@ -243,7 +251,7 @@ test("30关分为三章且每层都可组成三消", () => {
     { length: Math.floor(thirdLevelFirstLayer.length / 3) },
     (_, index) => thirdLevelFirstLayer.slice(index * 3, index * 3 + 3),
   ).filter((group) => group[0] === group[1] && group[1] === group[2]);
-  expect(patternedTriplets.length < 2, "同类三件物品不应继续按整组三连规律排放");
+  expect(patternedTriplets.length === 0, "同类三件物品不应继续按整组三连规律排放");
 });
 
 test("矮屏设备会给底部操作区和盘面留出空间", () => {

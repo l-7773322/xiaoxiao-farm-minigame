@@ -25,8 +25,8 @@ export class DropSystem {
         toX: x,
         toY: y,
         delay: tile.layer === removed.layer
-          ? Math.min(110, sequence * 5)
-          : 35 + layerRank * 24 + Math.min(80, sequence * 3),
+          ? 0
+          : 70 + layerRank * 42,
       }));
   }
 }
