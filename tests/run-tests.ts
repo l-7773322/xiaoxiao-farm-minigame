@@ -13,20 +13,25 @@ import { drawItemIcon } from "../src/ui/CanvasDrawing";
 let nextId = 1;
 let passed = 0;
 
-test("局部挤压只影响空位附近的物品，并从两侧同时靠拢", () => {
+test("空位会沿着原有排列传递，不会把水果直接吸到中心", () => {
   const bounds: PileBounds = { left: 0, top: 0, right: 320, bottom: 300 };
-  const removed = createTile("apple", { x: 136, y: 120, layer: 0 });
-  const left = createTile("corn", { x: 80, y: 120, layer: 0 });
-  const right = createTile("berry", { x: 192, y: 120, layer: 0 });
-  const far = createTile("pumpkin", { x: 266, y: 120, layer: 0 });
+  const removed = createTile("apple", { layer: 0 });
+  const left = createTile("corn", { layer: 0 });
+  const right = createTile("berry", { layer: 0 });
+  const far = createTile("pumpkin", { layer: 0 });
+  const tiles = [removed, left, right, far];
+  for (const target of new PileLayout().compute(tiles, bounds)) {
+    target.tile.x = target.x;
+    target.tile.y = target.y;
+  }
   removed.removed = true;
-  const moves = new DropSystem(bounds).release([removed, left, right, far], removed);
+  const moves = new DropSystem(bounds).release(tiles, removed);
   const leftMove = moves.find((move) => move.tile.id === left.id);
   const rightMove = moves.find((move) => move.tile.id === right.id);
-  expect(leftMove !== undefined && leftMove.toX > leftMove.fromX, "左侧邻居应朝空位移动");
-  expect(rightMove !== undefined && rightMove.toX < rightMove.fromX, "右侧邻居应朝空位移动");
-  expect(!moves.some((move) => move.tile.id === far.id), "远处物品不应参与重排");
-  expect(moves.every((move) => move.delay === 0), "局部挤压应在同一时刻启动");
+  expect(leftMove !== undefined && rightMove !== undefined, "空位后面的水果应参与补位");
+  expect(leftMove !== undefined && Math.abs(leftMove.toX - leftMove.fromX) > 8, "第一个邻居应明显滑入空位");
+  expect(rightMove !== undefined && Math.abs(rightMove.toX - rightMove.fromX) > 8, "后续水果应继续沿排列滑动");
+  expect(moves.every((move) => move.delay === 0), "同一排的补位应同时启动");
 });
 
 function createTile(type: ItemType, options: Partial<{ x: number; y: number; layer: number }> = {}): Tile {

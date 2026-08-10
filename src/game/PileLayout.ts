@@ -12,6 +12,7 @@ export interface PackedTarget {
   x: number;
   y: number;
   layerRank: number;
+  row: number;
   sequence: number;
 }
 
@@ -80,6 +81,7 @@ export class PileLayout {
           x: this.clamp(unclampedX, bounds.left + 4, bounds.right - tile.width - 4),
           y: this.clamp(unclampedY, bounds.top + 4, bounds.bottom - tile.height - 4),
           layerRank,
+          row,
           sequence,
         });
       });
