@@ -224,8 +224,8 @@ export class GameManager {
       });
     }
     this.toast = this.toast.includes("× 3")
-      ? `${this.toast} · 空位正在同步挤压补位`
-      : "空位附近物品正同步挤压补位";
+      ? `${this.toast} · 空位沿排列传递补位`
+      : "空位沿排列传递，邻近物品正在补位";
 
     if (typeof requestAnimationFrame === "undefined") {
       for (const move of moves) {
@@ -667,11 +667,7 @@ export class GameManager {
   }
 
   private drawBasket(): void {
-    const { centerX, centerY, radiusX, radiusY } = getSceneLayout(this.width, this.height);
-    const left = centerX - radiusX;
-    const top = centerY - radiusY;
-    const width = radiusX * 2;
-    const height = radiusY * 2;
+    const { left, top, width, height } = this.getBasketRect();
     const innerInset = 12;
     const innerLeft = left + innerInset;
     const innerTop = top + innerInset;
@@ -728,10 +724,7 @@ export class GameManager {
   }
 
   private drawBasketFrontRim(): void {
-    const { centerX, centerY, radiusX, radiusY } = getSceneLayout(this.width, this.height);
-    const left = centerX - radiusX;
-    const bottom = centerY + radiusY;
-    const width = radiusX * 2;
+    const { left, bottom, width } = this.getBasketRect();
     roundedRect(this.context, left + 7, bottom - 29, width - 14, 33, 10);
     this.context.fillStyle = "#704126";
     this.context.fill();
@@ -746,11 +739,11 @@ export class GameManager {
   private drawScene(): void {
     const activeCount = this.sceneTiles.reduce((count, tile) => count + (tile.removed ? 0 : 1), 0);
     const detail = activeCount > 130 ? "dense" : "full";
-    const { centerX, centerY, radiusX, radiusY } = getSceneLayout(this.width, this.height);
-    const left = centerX - radiusX + 14;
-    const top = centerY - radiusY + 14;
-    const width = radiusX * 2 - 28;
-    const height = radiusY * 2 - 46;
+    const basket = this.getBasketRect();
+    const left = basket.left + 14;
+    const top = basket.top + 14;
+    const width = basket.width - 28;
+    const height = basket.height - 46;
     this.context.save();
     roundedRect(this.context, left, top, width, height, 10);
     this.context.clip();
@@ -770,6 +763,26 @@ export class GameManager {
       );
     }
     this.context.restore();
+  }
+
+  private getBasketRect(): { left: number; top: number; width: number; height: number; bottom: number } {
+    const { centerX, centerY, radiusX, radiusY } = getSceneLayout(this.width, this.height);
+    const left = centerX - radiusX;
+    const baseTop = centerY - radiusY;
+    const bottom = centerY + radiusY;
+    const width = radiusX * 2;
+    const active = this.sceneTiles.filter((tile) => !tile.removed);
+    if (active.length === 0) {
+      return { left, top: baseTop, width, height: bottom - baseTop, bottom };
+    }
+
+    const contentTop = Math.min(...active.map((tile) => tile.y));
+    const contentBottom = Math.max(...active.map((tile) => tile.y + tile.height));
+    const contentHeight = contentBottom - contentTop;
+    const minimumHeight = Math.min(bottom - baseTop, Math.max(250, contentHeight + 64));
+    const snugTop = Math.max(baseTop, contentTop - 30);
+    const top = Math.min(snugTop, bottom - minimumHeight);
+    return { left, top, width, height: bottom - top, bottom };
   }
 
   private drawTools(): void {
