@@ -126,7 +126,7 @@ assert.equal(typeof touchEndListener, "function", "小游戏入口应注册触�
 assert(drawnTexts.includes("消消农场"), "首页应绘制游戏标题");
 assert(drawnTexts.includes("农场进度"), "首页应显示精简进度卡");
 assert(drawnTexts.includes("开始第 1 关"), "新存档应从第一关开始");
-assert(drawnTexts.includes("重新挑战第 1 关"), "首页应显示重新挑战入口");
+assert(!drawnTexts.includes("重新挑战第 1 关"), "首页不应重复绘制第 1 关入口");
 assert(drawnTexts.includes("关卡地图"), "首页应提供关卡地图入口");
 assert(drawnTexts.includes("选择主题"), "首页应提供精简主题选择");
 assert(drawnTexts.some((text) => text.includes("每日挑战")), "首页应提供每日挑战入口");
@@ -165,7 +165,7 @@ tap(187, 496);
 assert(drawnTexts.includes("消消农场"), "暂停面板应提供退出到首页入口");
 
 drawnTexts.length = 0;
-tap(187, 710);
+tap(187, 670);
 assert(drawnTexts.includes("30 关挑战地图"), "关卡地图应展示 30 关");
 assert(drawnTexts.includes("第 1 章 · 新手农场"), "关卡地图应展示第一章");
 assert(drawnTexts.includes("第 2 章 · 丰收田园"), "关卡地图应展示第二章");
@@ -214,11 +214,11 @@ drawnTexts.length = 0;
 tap(44, 64);
 assert(drawnTexts.includes("游戏已暂停"), "点击顶部暂停按钮后应显示暂停面板");
 tap(187, 496);
-assert(drawnTexts.includes("重新挑战第 1 关"), "退出暂停面板后应保留重新挑战入口");
+assert(drawnTexts.includes("开始第 1 关"), "退出暂停面板后应保留第 1 关主入口");
 
 drawnTexts.length = 0;
-tap(187, 670);
-assert(drawnTexts.includes("第 1 关 · 清晨果摊"), "点击重新挑战应返回刚才游玩的关卡");
+tap(187, 570);
+assert(drawnTexts.includes("第 1 关 · 清晨果摊"), "点击第 1 关主入口应重新开始首关");
 const soundsBeforeLongPressRelease = soundPlayCount;
 longPressRelease(90, 512);
 assert.equal(soundPlayCount, soundsBeforeLongPressRelease + 1, "长按后松开露出的物品也应只收集一次");

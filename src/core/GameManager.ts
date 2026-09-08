@@ -95,7 +95,6 @@ export class GameManager {
   private levelSelectButton: Rect = { ...EMPTY_RECT };
   private dailyButton: Rect = { ...EMPTY_RECT };
   private catalogButton: Rect = { ...EMPTY_RECT };
-  private replayButton: Rect = { ...EMPTY_RECT };
   private reviveButton: Rect = { ...EMPTY_RECT };
   private itemSetButtons: Record<ItemSetName, Rect> = {
     produce: { ...EMPTY_RECT },
@@ -289,6 +288,10 @@ export class GameManager {
     this.timerPaused = false;
     this.pauseReason = "manual";
     this.pauseExitButton = { ...EMPTY_RECT };
+    this.primaryButton = { ...EMPTY_RECT };
+    this.dailyButton = { ...EMPTY_RECT };
+    this.levelSelectButton = { ...EMPTY_RECT };
+    this.catalogButton = { ...EMPTY_RECT };
     this.slots.reset();
     this.moveOutCredits.clear();
     this.render();
@@ -469,8 +472,6 @@ export class GameManager {
       } else if (this.isPointInRect(point, this.catalogButton)) {
         this.status = "catalog";
         this.render();
-      } else if (this.isPointInRect(point, this.replayButton)) {
-        this.beginStage(0);
       } else if (this.isPointInRect(point, this.levelSelectButton)) {
         this.status = "levels";
         this.render();
@@ -1199,22 +1200,9 @@ export class GameManager {
       this.dailyButton.y + 21,
     );
 
-    this.replayButton = {
-      x: 43,
-      y: this.height - 162,
-      width: this.width - 86,
-      height: 50,
-    };
-    this.drawRaisedButton(
-      this.replayButton,
-      "重新挑战第 1 关",
-      "#719b61",
-      "#527a46",
-    );
-
     this.levelSelectButton = {
       x: 72,
-      y: this.height - 105,
+      y: this.height - 160,
       width: this.width - 144,
       height: 42,
     };
@@ -1237,7 +1225,7 @@ export class GameManager {
 
     this.catalogButton = {
       x: 90,
-      y: this.height - 61,
+      y: this.height - 114,
       width: this.width - 180,
       height: 34,
     };
