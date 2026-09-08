@@ -44,6 +44,7 @@ interface MiniGameCanvasContext2D {
   clip(): void;
   fillRect(x: number, y: number, width: number, height: number): void;
   clearRect(x: number, y: number, width: number, height: number): void;
+  drawImage(image: MiniGameImage, x: number, y: number, width: number, height: number): void;
   fillText(text: string, x: number, y: number): void;
   save(): void;
   restore(): void;
@@ -51,6 +52,12 @@ interface MiniGameCanvasContext2D {
   rotate(angle: number): void;
   scale(x: number, y: number): void;
   createLinearGradient(x0: number, y0: number, x1: number, y1: number): MiniGameCanvasGradient;
+}
+
+interface MiniGameImage {
+  src: string;
+  onload?: () => void;
+  onerror?: () => void;
 }
 
 interface MiniGameCanvas {
@@ -97,12 +104,26 @@ interface WxMiniGameApi {
   createCanvas(): MiniGameCanvas;
   getSystemInfoSync(): MiniGameSystemInfo;
   onTouchStart(listener: (event: MiniGameTouchEvent) => void): void;
+  onTouchMove?(listener: (event: MiniGameTouchEvent) => void): void;
+  onTouchEnd?(listener: (event: MiniGameTouchEvent) => void): void;
+  onTouchCancel?(listener: (event: MiniGameTouchEvent) => void): void;
+  onHide?(listener: () => void): void;
+  onShow?(listener: () => void): void;
+  vibrateShort?(options?: { type?: "heavy" | "medium" | "light" }): void;
+  createImage?(): MiniGameImage;
   createWebAudioContext?(): MiniGameWebAudioContext;
   getStorageSync?(key: string): unknown;
   setStorageSync?(key: string, value: unknown): void;
+  createRewardedVideoAd?(options: { adUnitId: string }): {
+    show(): Promise<void>;
+    onClose(listener: (result?: { isEnded?: boolean }) => void): void;
+    onError?(listener: (error: unknown) => void): void;
+  };
 }
 
 declare const wx: WxMiniGameApi;
 
 declare function requestAnimationFrame(callback: (time: number) => void): number;
 declare function cancelAnimationFrame(handle: number): void;
+declare function setTimeout(handler: () => void, timeout?: number): number;
+declare function clearTimeout(handle: number): void;

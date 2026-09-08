@@ -3,3 +3,4 @@ minigame/
 build-tests/
 *.log
 .DS_Store
+tmp/

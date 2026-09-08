@@ -8,7 +8,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsc -p tsconfig.test.json && node build-tests/tests/run-tests.js",
     "smoke": "pnpm run build && node tests/minigame-smoke.cjs",
-    "verify": "pnpm run typecheck && pnpm run test && pnpm run smoke"
+    "verify:fruit-assets": "python scripts/verify-fruit-assets.py",
+    "verify:item-assets": "python scripts/verify-real-item-assets.py",
+    "verify": "pnpm run typecheck && pnpm run test && pnpm run smoke && pnpm run verify:fruit-assets && pnpm run verify:item-assets"
   },
   "devDependencies": {
     "typescript": "^7.0.2"

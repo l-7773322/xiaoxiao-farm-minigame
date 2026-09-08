@@ -25,7 +25,7 @@ export interface PackedTarget {
  * exactly that offset.
  */
 export class PileLayout {
-  public compute(tiles: readonly Tile[], bounds: PileBounds): PackedTarget[] {
+  public compute(tiles: readonly Tile[], bounds: PileBounds, verticalBias = 0, rowStepScale = 0.58): PackedTarget[] {
     const active = tiles.filter((tile) => !tile.removed);
     if (active.length === 0) {
       return [];
@@ -51,7 +51,7 @@ export class PileLayout {
       bounds.bottom - bounds.top - maximumHeight - 8 - (allLayers.length - 1) * layerDrop,
     );
     const stepY = maximumRows > 1
-      ? Math.max(maximumHeight * 0.42, Math.min(maximumHeight * 0.58, availableForRows / (maximumRows - 1)))
+      ? Math.max(maximumHeight * 0.42, Math.min(maximumHeight * rowStepScale, availableForRows / (maximumRows - 1)))
       : maximumHeight * 0.55;
     const centerX = (bounds.left + bounds.right) / 2;
     const targets: PackedTarget[] = [];
@@ -61,7 +61,7 @@ export class PileLayout {
         .filter((tile) => tile.layer === layer)
         .sort((left, right) => left.id - right.id);
       const layerShift = ((layer % 3) - 1) * stepX * 0.22;
-      const rowBottom = bounds.bottom - maximumHeight - 4 - layerRank * layerDrop;
+      const rowBottom = bounds.bottom - maximumHeight - 4 - layerRank * layerDrop - verticalBias;
 
       layerTiles.forEach((tile, sequence) => {
         const row = Math.floor(sequence / columns);

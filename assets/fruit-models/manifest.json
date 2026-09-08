@@ -1,0 +1,39 @@
+{
+  "version": 4,
+  "style": "photorealistic-pbr-3d-fruit-scan",
+  "lighting": "consistent-upper-left-soft-studio-key",
+  "views": ["front", "three-quarter", "side", "top"],
+  "master": {
+    "directory": "sprites/master",
+    "format": "png",
+    "size": [512, 512],
+    "alpha": true
+  },
+  "runtime": {
+    "directory": "sprites/runtime",
+    "format": "webp",
+    "size": [256, 256],
+    "alpha": true
+  },
+  "fruits": [
+    { "id": "apple", "name": "苹果", "sheet": "classic-photoreal-v2-clean.png", "row": 0 },
+    { "id": "pear", "name": "梨", "sheet": "classic-photoreal-v2-clean.png", "row": 1 },
+    { "id": "orange", "name": "橙子", "sheet": "classic-photoreal-v2-clean.png", "row": 2 },
+    { "id": "banana", "name": "香蕉", "sheet": "tropical-photoreal-v2-clean.png", "row": 0 },
+    { "id": "pineapple", "name": "菠萝", "sheet": "tropical-photoreal-v2-clean.png", "row": 1 },
+    { "id": "mango", "name": "芒果", "sheet": "tropical-photoreal-v2-clean.png", "row": 2 },
+    { "id": "watermelon", "name": "西瓜", "sheet": "melon-photoreal-v2-clean.png", "row": 0 },
+    { "id": "cantaloupe", "name": "哈密瓜", "sheet": "melon-photoreal-v2-clean.png", "row": 1 },
+    { "id": "pomegranate", "name": "石榴", "sheet": "melon-photoreal-v2-clean.png", "row": 2 },
+    { "id": "dragon-fruit", "name": "火龙果", "sheet": "special-photoreal-v2-clean.png", "row": 0 },
+    { "id": "coconut", "name": "椰子", "sheet": "special-photoreal-v2-clean.png", "row": 1 },
+    { "id": "avocado", "name": "牛油果", "sheet": "special-photoreal-v2-clean.png", "row": 2 },
+    { "id": "strawberry", "name": "草莓", "sheet": "orchard-photoreal-v2-clean.png", "row": 0 },
+    { "id": "lemon", "name": "柠檬", "sheet": "orchard-photoreal-v2-clean.png", "row": 1 },
+    { "id": "peach", "name": "桃子", "sheet": "orchard-photoreal-v2-clean.png", "row": 2 },
+    { "id": "kiwi", "name": "猕猴桃", "sheet": "exotic-photoreal-v2-clean.png", "row": 0 },
+    { "id": "grapes", "name": "葡萄", "sheet": "exotic-photoreal-v2-clean.png", "row": 1 },
+    { "id": "papaya", "name": "木瓜", "sheet": "exotic-photoreal-v2-clean.png", "row": 2 }
+  ],
+  "filenamePattern": "{fruit}-{view}.{extension}"
+}
